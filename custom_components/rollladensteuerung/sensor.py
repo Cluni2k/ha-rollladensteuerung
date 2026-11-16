@@ -33,9 +33,13 @@ class NaechsteZeit(Basis, SensorEntity):
 
     @property
     def native_value(self) -> datetime | None:
-        if self.sid is not None:
-            return getattr(self.steuerung.rolllaeden[self.sid].z, f"{self._art}_zeit")
         modus = "modus_hoch" if self._art == "hoch" else "modus_runter"
+        if self.sid is not None:
+            # Automatik aus oder dieser Teil (Öffnen/Schließen) abgeschaltet → keine Zeit anzeigen
+            r = self.steuerung.rolllaeden[self.sid]
+            if not self.steuerung.aktiv.get(self.sid) or getattr(r.e, modus) == "aus":
+                return None
+            return getattr(r.z, f"{self._art}_zeit")
         zeiten = [getattr(r.z, f"{self._art}_zeit") for sid, r in self.steuerung.rolllaeden.items()
                   if self.steuerung.aktiv.get(sid) and getattr(r.e, modus) != "aus"]
         zeiten = [z for z in zeiten if z]

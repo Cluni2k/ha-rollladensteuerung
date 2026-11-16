@@ -5,7 +5,7 @@
  *  - Ansichts-/Dashboard-Vorlage (strategy) custom:rollladensteuerung – baut die Ansicht aus allen
  *    eingerichteten Rollläden (nach Stockwerk gruppiert), neue Rollläden erscheinen automatisch.
  */
-const VERSION = "0.3.3";
+const VERSION = "0.3.4";
 
 const TEXTE = {
   de: {
@@ -23,7 +23,7 @@ const TEXTE = {
     zaehler_gestern: "Abschattungsfahrten gestern", ja: "ja", nein: "nein", unbekannt: "–",
     offen: "offen", zu: "zu", gekippt: "gekippt", laedt: "Lädt …", naechstes_oeffnen: "Nächstes Öffnen",
     naechstes_schliessen: "Nächstes Schließen", keine_konfig: "Rollladensteuerung ist nicht eingerichtet.",
-    nur_admin: "Nur Administratoren können Einstellungen ändern.", auswaehlen: "Entität wählen oder tippen …", entfernen: "Entfernen",
+    nur_admin: "Nur Administratoren können Einstellungen ändern.", aus: "aus", auswaehlen: "Entität wählen oder tippen …", entfernen: "Entfernen",
   },
   en: {
     speichern: "Save", abbrechen: "Cancel", schliessen: "Close", status: "Status",
@@ -40,7 +40,7 @@ const TEXTE = {
     zaehler_gestern: "Shading moves yesterday", ja: "yes", nein: "no", unbekannt: "–",
     offen: "open", zu: "closed", gekippt: "tilted", laedt: "Loading …", naechstes_oeffnen: "Next opening",
     naechstes_schliessen: "Next closing", keine_konfig: "Shutter control is not set up.",
-    nur_admin: "Only administrators can change settings.", auswaehlen: "Pick or type an entity …", entfernen: "Remove",
+    nur_admin: "Only administrators can change settings.", aus: "off", auswaehlen: "Pick or type an entity …", entfernen: "Remove",
   },
 };
 const tx = (hass, key) => (TEXTE[(hass?.language || "en").split("-")[0]] || TEXTE.en)[key] || key;
@@ -82,6 +82,12 @@ function zeit(hass, wert) {
   const uhr = d.toLocaleTimeString(sprache, { hour: "2-digit", minute: "2-digit" });
   if (d.toDateString() === heute.toDateString()) return uhr;
   return `${d.toLocaleDateString(sprache, { weekday: "short" })} ${uhr}`;
+}
+
+// [Öffnen aus, Schließen aus] – Automatik des Rollladens aus oder Modus „aus“
+function automatikAus(hass, rl) {
+  const aus = hass.states[rl?.entities?.automatik]?.state === "off";
+  return [aus || rl?.daten?.modus_hoch === "aus", aus || rl?.daten?.modus_runter === "aus"];
 }
 
 function navigieren(pfad) {
@@ -242,8 +248,9 @@ class RollladenKarte extends HTMLElement {
     const s = this._hass.states[ents.status];
     const texte = this._konfig?.status_texte || {};
     r.querySelector(".status").textContent = s ? (texte[s.state] || s.state) : "–";
-    r.querySelector(".hoch").textContent = `↑ ${zeit(this._hass, this._hass.states[ents.oeffnen]?.state)}`;
-    r.querySelector(".runter").textContent = `↓ ${zeit(this._hass, this._hass.states[ents.schliessen]?.state)}`;
+    const [hochAus, runterAus] = automatikAus(this._hass, this._rl);
+    r.querySelector(".hoch").textContent = `↑ ${hochAus ? tx(this._hass, "aus") : zeit(this._hass, this._hass.states[ents.oeffnen]?.state)}`;
+    r.querySelector(".runter").textContent = `↓ ${runterAus ? tx(this._hass, "aus") : zeit(this._hass, this._hass.states[ents.schliessen]?.state)}`;
   }
 
   async _dialog() {
@@ -554,8 +561,8 @@ class EinstellDialog extends HTMLElement {
     const zeilen = [
       [tx(h, "status"), s ? (this._k.status_texte[s.state] || s.state) : "–"],
       [tx(h, "letzte_meldung"), a.letzte_meldung || "–"],
-      [tx(h, "naechstes_oeffnen"), zeit(h, h.states[ents.oeffnen]?.state)],
-      [tx(h, "naechstes_schliessen"), zeit(h, h.states[ents.schliessen]?.state)],
+      [tx(h, "naechstes_oeffnen"), automatikAus(h, this._rl)[0] ? tx(h, "aus") : zeit(h, h.states[ents.oeffnen]?.state)],
+      [tx(h, "naechstes_schliessen"), automatikAus(h, this._rl)[1] ? tx(h, "aus") : zeit(h, h.states[ents.schliessen]?.state)],
       [tx(h, "fenster"), a.fenster ? (fenster[a.fenster] || a.fenster) : "–"],
       [tx(h, "helligkeit_akt"), a.helligkeit != null ? `${Math.round(a.helligkeit)} lx` : "–"],
       [tx(h, "raumtemp"), a.raumtemperatur != null ? `${a.raumtemperatur} °C` : "–"],
