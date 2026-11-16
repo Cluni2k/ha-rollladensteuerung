@@ -106,6 +106,7 @@ DIENSTE = {
     "neu_berechnen": (L("Zeiten neu berechnen", "Recalculate times"), L("Berechnet die nächsten Öffnen- und Schließzeiten aller Rollläden neu.", "Recalculates next open/close times.")),
     "abschattung_pruefen": (L("Abschattung jetzt prüfen", "Check sun protection now"), L("Prüft die Abschattung sofort für alle Rollläden.", "Runs the sun protection check now.")),
     "alle_oeffnen": (L("Alle öffnen", "Open all"), L("Fährt jeden Rollladen auf seine eingestellte Offen-Position.", "Moves every shutter to its configured open position.")),
+    "alle_abschatten": (L("Alle abschatten", "Shade all"), L("Fährt jeden Rollladen mit eingeschalteter Abschattung auf seine Abschattungsposition (nur nach unten).", "Moves every shutter with sun protection enabled down to its shading position.")),
     "alle_lueften": (L("Alle lüften", "Ventilate all"), L("Fährt jeden Rollladen auf seine eingestellte Lüften-Position.", "Moves every shutter to its ventilation position.")),
     "alle_schliessen": (L("Alle schließen", "Close all"), L("Fährt jeden Rollladen auf seine eingestellte Geschlossen-Position.", "Moves every shutter to its configured closed position.")),
 }

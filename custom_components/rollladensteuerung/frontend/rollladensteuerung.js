@@ -5,12 +5,12 @@
  *  - Ansichts-/Dashboard-Vorlage (strategy) custom:rollladensteuerung – baut die Ansicht aus allen
  *    eingerichteten Rollläden (nach Stockwerk gruppiert), neue Rollläden erscheinen automatisch.
  */
-const VERSION = "0.3.2";
+const VERSION = "0.3.3";
 
 const TEXTE = {
   de: {
     speichern: "Speichern", abbrechen: "Abbrechen", schliessen: "Schließen", status: "Status",
-    einstellungen: "Einstellungen", alle_oeffnen: "Alle öffnen", alle_schliessen: "Alle schließen", alle_lueften: "Alle lüften",
+    einstellungen: "Einstellungen", alle_oeffnen: "Alle öffnen", alle_schliessen: "Alle schließen", alle_lueften: "Alle lüften", alle_abschatten: "Alle abschatten",
     raumtemp: "Raumtemperatur", vorhersage: "Heute erwartet (max.)", schlaeft: "Schläft noch", schatten_ziel: "Abschattungsposition jetzt",
     oeffnet: "Öffnet", schliesst: "Schließt", automatik: "Automatik", zentrale: "Rollladensteuerung",
     gespeichert: "Gespeichert", fehler: "Fehler", hinzufuegen: "Rollladen oder Helligkeitssensor hinzufügen/löschen",
@@ -27,7 +27,7 @@ const TEXTE = {
   },
   en: {
     speichern: "Save", abbrechen: "Cancel", schliessen: "Close", status: "Status",
-    einstellungen: "Settings", alle_oeffnen: "Open all", alle_schliessen: "Close all", alle_lueften: "Ventilate all",
+    einstellungen: "Settings", alle_oeffnen: "Open all", alle_schliessen: "Close all", alle_lueften: "Ventilate all", alle_abschatten: "Shade all",
     raumtemp: "Room temperature", vorhersage: "Forecast today (max)", schlaeft: "Still asleep", schatten_ziel: "Shading position now",
     oeffnet: "Opens", schliesst: "Closes", automatik: "Automation", zentrale: "Shutter control",
     gespeichert: "Saved", fehler: "Error", hinzufuegen: "Add/remove shutters or brightness sensors",
@@ -107,8 +107,8 @@ const GEMEINSAM_CSS = `
   button.rund { border: none; background: rgba(var(--rgb-primary-text-color, 0,0,0), 0.05); color: var(--primary-text-color);
     width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex: none; }
   button.rund:hover { background: rgba(var(--rgb-primary-text-color, 0,0,0), 0.1); }
-  .tasten { display: flex; gap: 10px; }
-  .tasten button { flex: 1; height: 42px; border: none; border-radius: 12px; cursor: pointer;
+  .tasten { display: flex; gap: 10px; flex-wrap: wrap; }
+  .tasten button { flex: 1 1 0; min-width: 0; height: 42px; white-space: nowrap; font: inherit; font-size: 13px; padding: 0 8px; border: none; border-radius: 12px; cursor: pointer;
     background: rgba(var(--rgb-primary-text-color, 0,0,0), 0.05); color: var(--primary-text-color);
     display: flex; align-items: center; justify-content: center; }
   .tasten button:disabled { color: var(--disabled-text-color); cursor: default; }
@@ -287,6 +287,7 @@ class ZentraleKarte extends HTMLElement {
           background: rgba(var(--rgb-primary-text-color, 0,0,0), 0.05); color: var(--primary-text-color); }
         .schalter button.an { background: rgba(var(--rgb-primary-color, 3,169,244), 0.18); }
         .schalter button.an ha-icon { color: var(--primary-color); }
+        .alle button { min-width: 130px; }
         .zeiten { display: flex; gap: 16px; font-size: 13px; color: var(--secondary-text-color); flex-wrap: wrap; }
         .zeiten b { color: var(--primary-text-color); font-weight: 500; }
       </style>
@@ -298,8 +299,9 @@ class ZentraleKarte extends HTMLElement {
           <button class="rund zahnrad" title="${tx(this._hass, "einstellungen")}"><ha-icon icon="mdi:cog"></ha-icon></button>
         </div>
         <div class="schalter"></div>
-        <div class="tasten">
+        <div class="tasten alle">
           <button data-dienst="alle_oeffnen"><ha-icon icon="mdi:arrow-up-box"></ha-icon>&nbsp;${tx(this._hass, "alle_oeffnen")}</button>
+          <button data-dienst="alle_abschatten"><ha-icon icon="mdi:sun-angle"></ha-icon>&nbsp;${tx(this._hass, "alle_abschatten")}</button>
           <button data-dienst="alle_lueften"><ha-icon icon="mdi:window-open-variant"></ha-icon>&nbsp;${tx(this._hass, "alle_lueften")}</button>
           <button data-dienst="alle_schliessen"><ha-icon icon="mdi:arrow-down-box"></ha-icon>&nbsp;${tx(this._hass, "alle_schliessen")}</button>
         </div>

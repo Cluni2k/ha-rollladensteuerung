@@ -356,6 +356,10 @@
       "name": "Open all",
       "description": "Moves every shutter to its configured open position."
     },
+    "alle_abschatten": {
+      "name": "Shade all",
+      "description": "Moves every shutter with sun protection enabled down to its shading position."
+    },
     "alle_lueften": {
       "name": "Ventilate all",
       "description": "Moves every shutter to its ventilation position."

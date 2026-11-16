@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from datetime import date, datetime, timedelta
@@ -96,6 +97,7 @@ class Steuerung:
         self._sende_sperre = asyncio.Lock()
         self._letzte_sendung = 0.0
         self._aufgaben: set[asyncio.Task] = set()
+        self._zeitbasis: dict[str, str] = {}   # Einstellungen, mit denen die geplanten Zeiten berechnet wurden
 
         hell = {sid: s.data.get(CONF_ENTITY) for sid, s in entry.subentries.items()
                 if s.subentry_type == SUB_HELLIGKEIT}
@@ -117,6 +119,7 @@ class Steuerung:
         for sid, r in self.rolllaeden.items():
             r.z = Zustand.laden((daten.get("rolllaeden") or {}).get(sid))
             self.aktiv[sid] = (daten.get("aktiv") or {}).get(sid, self.aktiv[sid])
+            self._zeitbasis[sid] = (daten.get("zeitbasis") or {}).get(sid, "")
             r.e.aktiv = self.aktiv[sid]
 
         covers = [r.e.cover for r in self.rolllaeden.values()]
@@ -139,7 +142,8 @@ class Steuerung:
         self._abmelden.append(async_track_time_interval(
             self.hass, self._abschattung_takt, timedelta(minutes=ABSCHATTUNG_INTERVALL_MIN)))
         for sid in self.rolllaeden:
-            await self.async_zeiten_planen(sid, behalten=True)
+            # nach einem Neustart die geplanten Zeiten behalten – nach geänderten Einstellungen neu rechnen
+            await self.async_zeiten_planen(sid, behalten=self._zeitbasis.get(sid) == self._basis(sid))
         self._melden()
 
     async def async_stop(self) -> None:
@@ -162,7 +166,7 @@ class Steuerung:
         await self.store.async_save(self._daten())
 
     def _daten(self) -> dict:
-        return {"schalter": self.schalter, "aktiv": self.aktiv,
+        return {"schalter": self.schalter, "aktiv": self.aktiv, "zeitbasis": self._zeitbasis,
                 "rolllaeden": {sid: r.z.speichern() for sid, r in self.rolllaeden.items()}}
 
     @callback
@@ -284,6 +288,16 @@ class Steuerung:
             return None
         return dt_util.as_local(t)
 
+    def _basis(self, sid: str) -> str:
+        """Alles, was die Öffnen-/Schließzeit beeinflusst – ändert es sich, wird neu gerechnet."""
+        e = self.rolllaeden[sid].e
+        werte = {k: self.cfg.get(k) for k in (CONF_ASTRO_MORGENS, CONF_ASTRO_ABENDS, CONF_HORIZONT_MORGENS,
+                                              CONF_HORIZONT_ABENDS, CONF_WERKTAG, CONF_SONNE)}
+        werte.update({k: getattr(e, k) for k in ("hoch", "runter", "zeit_hoch_frueh", "zeit_hoch_spaet",
+                                                 "zeit_hoch_we", "zeit_runter_frueh", "zeit_runter_spaet",
+                                                 "offset_morgens", "offset_abends", "zufall_minuten")})
+        return json.dumps(werte, sort_keys=True, default=str)
+
     async def async_zeiten_planen(self, sid: str, behalten: bool = False) -> None:
         """Nächste Öffnen- und Schließzeit dieses Rollladens bestimmen und Timer stellen."""
         r = self.rolllaeden[sid]
@@ -306,6 +320,7 @@ class Steuerung:
                     break
         r.z.hoch_zeit = neu.get("hoch")
         r.z.runter_zeit = neu.get("runter")
+        self._zeitbasis[sid] = self._basis(sid)
         for ab in self._timer.pop(sid, []):
             ab()
         timer = []
@@ -401,14 +416,23 @@ class Steuerung:
         self._melden()
 
     async def async_alle(self, art: str) -> None:
-        """„Alle öffnen/schließen/lüften“ – jeder Rollladen auf seine eigene Position, gestaffelt."""
+        """„Alle öffnen/schließen/lüften/abschatten“ – jeder Rollladen auf seine eigene Position, gestaffelt.
+
+        Abschatten: nur Rollläden mit eingeschalteter Abschattung, auf ihre (ggf. dynamische) Abschattungsposition,
+        und nur nach unten – ein geschlossener Rollladen wird dafür nicht geöffnet.
+        """
         u = self.umgebung()
         for sid, r in self.rolllaeden.items():
+            if art == "abschatten" and r.e.abschattung == "nein":
+                continue
             ziel, grund = {"oeffnen": (r.e.offen_pos, "Alle öffnen"),
                            "schliessen": (r.e.geschlossen_pos, "Alle schließen"),
-                           "lueften": (r.e.lueften_pos, "Alle lüften")}[art]
+                           "lueften": (r.e.lueften_pos, "Alle lüften"),
+                           "abschatten": (r.schattenpos(u), "Alle abschatten")}[art]
             lage = self.lage(sid)
             if lage.position is not None and abs(lage.position - ziel) <= 2:
+                continue
+            if art == "abschatten" and lage.position is not None and lage.position < ziel:
                 continue
             await self._ausfuehren(sid, r.fahren(u, lage, ziel, grund))
 

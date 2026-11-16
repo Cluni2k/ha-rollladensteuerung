@@ -356,6 +356,10 @@
       "name": "Alle öffnen",
       "description": "Fährt jeden Rollladen auf seine eingestellte Offen-Position."
     },
+    "alle_abschatten": {
+      "name": "Alle abschatten",
+      "description": "Fährt jeden Rollladen mit eingeschalteter Abschattung auf seine Abschattungsposition (nur nach unten)."
+    },
     "alle_lueften": {
       "name": "Alle lüften",
       "description": "Fährt jeden Rollladen auf seine eingestellte Lüften-Position."

@@ -55,7 +55,12 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         for st in _steuerungen():
             await st.async_alle("lueften")
 
+    async def _alle_abschatten(call: ServiceCall) -> None:
+        for st in _steuerungen():
+            await st.async_alle("abschatten")
+
     hass.services.async_register(DOMAIN, "alle_lueften", _alle_lueften)
+    hass.services.async_register(DOMAIN, "alle_abschatten", _alle_abschatten)
     hass.services.async_register(DOMAIN, "neu_berechnen", _neu_berechnen)
     hass.services.async_register(DOMAIN, "abschattung_pruefen", _abschattung_pruefen)
     hass.services.async_register(DOMAIN, "alle_oeffnen", _alle_oeffnen)

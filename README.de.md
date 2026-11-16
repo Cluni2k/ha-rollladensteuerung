@@ -39,7 +39,7 @@ Alles wird in der Oberfläche eingestellt, ein passendes Dashboard ist dabei.
 
 **Allgemein**
 - **Gestaffelte Fahrten** mit einstellbarem Abstand (schont z. B. den Homematic-Duty-Cycle) – auch bei
-  **Alle öffnen / lüften / schließen**, jeder Rollladen auf seine eigene Position.
+  **Alle öffnen / lüften / abschatten / schließen**, jeder Rollladen auf seine eigene Position.
 - Rollläden und Helligkeitssensoren werden in der Oberfläche **hinzugefügt, geändert und gelöscht**;
   ausgeblendete Entitäten werden nicht angeboten.
 - Sensoren für **nächstes Öffnen/Schließen**, ein **Status-Sensor** mit allen Merkern und das Ereignis
@@ -138,6 +138,7 @@ Frostschutz-Temperatur, Mindesthelligkeit für die Abschattungsprüfung, Wetter,
 |---|---|
 | `rollladensteuerung.alle_oeffnen` | jeder Rollladen auf seine Offen-Position (gestaffelt) |
 | `rollladensteuerung.alle_lueften` | jeder Rollladen auf seine Lüften-Position (gestaffelt) |
+| `rollladensteuerung.alle_abschatten` | jeder Rollladen mit eingeschalteter Abschattung auf seine Abschattungsposition (gestaffelt, nur nach unten) |
 | `rollladensteuerung.alle_schliessen` | jeder Rollladen auf seine Geschlossen-Position (gestaffelt) |
 | `rollladensteuerung.neu_berechnen` | nächste Öffnen-/Schließzeiten neu berechnen |
 | `rollladensteuerung.abschattung_pruefen` | Abschattung sofort prüfen |

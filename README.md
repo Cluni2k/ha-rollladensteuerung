@@ -42,7 +42,7 @@ integration – configured entirely in the UI, with its own dashboard.
 
 **General**
 - **Staggered commands** with an adjustable delay (protects e.g. the Homematic duty cycle) – also for
-  **open all / ventilate all / close all**, each shutter to its own configured position.
+  **open all / ventilate all / shade all / close all**, each shutter to its own configured position.
 - Shutters and brightness sensors are **added, changed and removed in the UI**; hidden entities are not offered.
 - Sensors for the **next opening/closing**, a **status sensor** with all internal flags, and the event
   `rollladensteuerung_fahrt` for your own notifications.
@@ -139,6 +139,7 @@ frost temperature, minimum brightness for the shading check, weather entity, del
 |---|---|
 | `rollladensteuerung.alle_oeffnen` | every shutter to its open position (staggered) |
 | `rollladensteuerung.alle_lueften` | every shutter to its ventilation position (staggered) |
+| `rollladensteuerung.alle_abschatten` | every shutter with sun protection enabled down to its shading position (staggered) |
 | `rollladensteuerung.alle_schliessen` | every shutter to its closed position (staggered) |
 | `rollladensteuerung.neu_berechnen` | recalculate the next opening/closing times |
 | `rollladensteuerung.abschattung_pruefen` | run the sun protection check now |
