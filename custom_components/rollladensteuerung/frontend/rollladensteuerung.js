@@ -5,7 +5,7 @@
  *  - Ansichts-/Dashboard-Vorlage (strategy) custom:rollladensteuerung – baut die Ansicht aus allen
  *    eingerichteten Rollläden (nach Stockwerk gruppiert), neue Rollläden erscheinen automatisch.
  */
-const VERSION = "0.3.1";
+const VERSION = "0.3.2";
 
 const TEXTE = {
   de: {
