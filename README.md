@@ -60,7 +60,7 @@ integration – configured entirely in the UI, with its own dashboard.
 ## Installation
 
 ### HACS (custom repository)
-1. HACS → ⋮ → *Custom repositories* → add `https://github.com/<YOUR-ACCOUNT>/ha-rollladensteuerung`,
+1. HACS → ⋮ → *Custom repositories* → add `https://github.com/Cluni2k/ha-rollladensteuerung`,
    category **Integration**.
 2. Install **Rollladensteuerung** and restart Home Assistant.
 

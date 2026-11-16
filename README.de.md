@@ -58,7 +58,7 @@ Alles wird in der Oberfläche eingestellt, ein passendes Dashboard ist dabei.
 ## Installation
 
 ### HACS (benutzerdefiniertes Repository)
-1. HACS → ⋮ → *Benutzerdefinierte Repositories* → `https://github.com/<DEIN-KONTO>/ha-rollladensteuerung`
+1. HACS → ⋮ → *Benutzerdefinierte Repositories* → `https://github.com/Cluni2k/ha-rollladensteuerung`
    hinzufügen, Kategorie **Integration**.
 2. **Rollladensteuerung** installieren und Home Assistant neu starten.
 
