@@ -1,0 +1,18 @@
+{
+  "domain": "rollladensteuerung",
+  "name": "Rollladensteuerung",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": [
+    "sun",
+    "http",
+    "frontend",
+    "websocket_api"
+  ],
+  "documentation": "https://forum.fhem.de/index.php/topic,73964.0.html",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "0.3.0"
+}

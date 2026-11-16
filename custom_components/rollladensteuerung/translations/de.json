@@ -1,0 +1,368 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Rollladensteuerung",
+        "description": "Globale Einstellungen. Rollläden und Helligkeitssensoren fügst du danach als Einträge hinzu.",
+        "data": {
+          "anwesenheit": "Anwesenheit (an/zu Hause = jemand da)",
+          "temperatur": "Außentemperatur",
+          "werktag": "Arbeitstag-Sensor (z. B. Workday)",
+          "sonne": "Sonne",
+          "astro_morgens": "Astro-Modus morgens",
+          "horizont_morgens": "Horizont morgens (nur bei „Eigener Horizont“)",
+          "astro_abends": "Astro-Modus abends",
+          "horizont_abends": "Horizont abends (nur bei „Eigener Horizont“)",
+          "frost_temp": "Frostschutz-Temperatur",
+          "helligkeit_min": "Abschattung erst prüfen ab Helligkeit",
+          "wetter": "Wettervorhersage (optional, für „heute erwartet“)",
+          "abstand_sekunden": "Abstand zwischen Rollladenfahrten (schont den Funk-Duty-Cycle)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Die Rollladensteuerung ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Globale Einstellungen",
+        "data": {
+          "anwesenheit": "Anwesenheit (an/zu Hause = jemand da)",
+          "temperatur": "Außentemperatur",
+          "werktag": "Arbeitstag-Sensor (z. B. Workday)",
+          "sonne": "Sonne",
+          "astro_morgens": "Astro-Modus morgens",
+          "horizont_morgens": "Horizont morgens (nur bei „Eigener Horizont“)",
+          "astro_abends": "Astro-Modus abends",
+          "horizont_abends": "Horizont abends (nur bei „Eigener Horizont“)",
+          "frost_temp": "Frostschutz-Temperatur",
+          "helligkeit_min": "Abschattung erst prüfen ab Helligkeit",
+          "wetter": "Wettervorhersage (optional, für „heute erwartet“)",
+          "abstand_sekunden": "Abstand zwischen Rollladenfahrten (schont den Funk-Duty-Cycle)"
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "rollladen": {
+      "entry_type": "Rollladen",
+      "initiate_flow": {
+        "user": "Rollladen hinzufügen",
+        "reconfigure": "Rollladen bearbeiten"
+      },
+      "step": {
+        "user": {
+          "title": "Rollladen",
+          "data": {
+            "grundlagen": "Grundlagen",
+            "zeiten": "Zeiten",
+            "positionen": "Positionen",
+            "fenster": "Fenster",
+            "abschattung": "Abschattung"
+          },
+          "sections": {
+            "grundlagen": {
+              "name": "Grundlagen",
+              "data": {
+                "name": "Name",
+                "cover": "Rollladen",
+                "aktiv": "Automatik aktiv",
+                "modus_hoch": "Automatisch öffnen",
+                "modus_runter": "Automatisch schließen",
+                "frostschutz": "Frostschutz: morgens nicht öffnen bei Frost",
+                "gaestezimmer": "Gästezimmer: nicht öffnen, wenn Gast da",
+                "partymodus": "Partymodus: abends erst nach der Party schließen",
+                "schlaf": "Schlafschalter (optional): morgens erst öffnen, wenn aus"
+              }
+            },
+            "zeiten": {
+              "name": "Zeiten",
+              "data": {
+                "hoch": "Öffnen nach",
+                "zeit_hoch_frueh": "Öffnen frühestens (Arbeitstag)",
+                "zeit_hoch_spaet": "Öffnen spätestens (Arbeitstag)",
+                "zeit_hoch_we": "Öffnen am Wochenende/Feiertag",
+                "offset_morgens": "Versatz morgens",
+                "runter": "Schließen nach",
+                "zeit_runter_frueh": "Schließen frühestens",
+                "zeit_runter_spaet": "Schließen spätestens",
+                "offset_abends": "Versatz abends",
+                "zufall_minuten": "Zufall (± Minuten)"
+              }
+            },
+            "positionen": {
+              "name": "Positionen",
+              "data": {
+                "offen_pos": "Offen (morgens)",
+                "geschlossen_pos": "Geschlossen (abends)",
+                "lueften_pos": "Lüften (Fenster gekippt)",
+                "geoeffnet_pos": "Geöffnet (Tür/Fenster offen)",
+                "pos_nach_komfort_oeffnen": "Nach Schließen der Tür (-1 = vorherige, -2 = Geöffnet-Position)"
+              }
+            },
+            "fenster": {
+              "name": "Fenster",
+              "data": {
+                "fenster": "Fensterkontakte bzw. Drehgriff",
+                "luft_fenster_offen": "Bei offenem Fenster auf Lüften/Geöffnet fahren",
+                "aussperrschutz": "Aussperrschutz (bei offener Tür nie herunterfahren)"
+              }
+            },
+            "abschattung": {
+              "name": "Abschattung",
+              "data": {
+                "abschattung": "Abschattung",
+                "helligkeitssensor": "Helligkeitssensor",
+                "himmelsrichtung": "Himmelsrichtung des Fensters (90 = Ost, 180 = Süd, 270 = West)",
+                "winkel_links": "Winkel links (Sonne vor dem Fenster)",
+                "winkel_rechts": "Winkel rechts (Sonne nach dem Fenster)",
+                "min_elevation": "Mindest-Sonnenhöhe",
+                "schwelle_sonnig": "Schwelle sonnig (abschatten ab)",
+                "schwelle_wolkig": "Schwelle wolkig (Ende unter)",
+                "min_temp_aussen": "Mindest-Außentemperatur",
+                "min_temp_vorhersage": "Nur abschatten, wenn heute mindestens erwartet (optional)",
+                "raumtemperatur": "Raumtemperatur (optional, Winter: Sonne heizt mit)",
+                "min_temp_innen": "Nur abschatten ab Raumtemperatur",
+                "abschattung_dynamisch": "Position nach Sonnenhöhe anpassen (dynamisch)",
+                "fensterhoehe": "Fensterhöhe (Öffnung)",
+                "bruestung": "Abstand Fenster–Boden (Brüstung)",
+                "eindringtiefe": "Sonne darf so weit in den Raum scheinen",
+                "abschattung_pos": "Abschattungsposition",
+                "pos_nach_abschattung": "Position nach der Abschattung (-1 = vorherige)",
+                "wartezeit": "Wartezeit zwischen Fahrten",
+                "sperrzeit_nach_manuell": "Sperrzeit nach manueller Fahrt",
+                "sperrzeit_vor_nacht": "Sperrzeit vor dem Schließen am Abend",
+                "schnell_oeffnen": "Nach Abschatten schnell wieder öffnen",
+                "schnell_schliessen": "Nach Öffnen schnell wieder abschatten"
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Rollladen",
+          "data": {
+            "grundlagen": "Grundlagen",
+            "zeiten": "Zeiten",
+            "positionen": "Positionen",
+            "fenster": "Fenster",
+            "abschattung": "Abschattung"
+          },
+          "sections": {
+            "grundlagen": {
+              "name": "Grundlagen",
+              "data": {
+                "name": "Name",
+                "cover": "Rollladen",
+                "aktiv": "Automatik aktiv",
+                "modus_hoch": "Automatisch öffnen",
+                "modus_runter": "Automatisch schließen",
+                "frostschutz": "Frostschutz: morgens nicht öffnen bei Frost",
+                "gaestezimmer": "Gästezimmer: nicht öffnen, wenn Gast da",
+                "partymodus": "Partymodus: abends erst nach der Party schließen",
+                "schlaf": "Schlafschalter (optional): morgens erst öffnen, wenn aus"
+              }
+            },
+            "zeiten": {
+              "name": "Zeiten",
+              "data": {
+                "hoch": "Öffnen nach",
+                "zeit_hoch_frueh": "Öffnen frühestens (Arbeitstag)",
+                "zeit_hoch_spaet": "Öffnen spätestens (Arbeitstag)",
+                "zeit_hoch_we": "Öffnen am Wochenende/Feiertag",
+                "offset_morgens": "Versatz morgens",
+                "runter": "Schließen nach",
+                "zeit_runter_frueh": "Schließen frühestens",
+                "zeit_runter_spaet": "Schließen spätestens",
+                "offset_abends": "Versatz abends",
+                "zufall_minuten": "Zufall (± Minuten)"
+              }
+            },
+            "positionen": {
+              "name": "Positionen",
+              "data": {
+                "offen_pos": "Offen (morgens)",
+                "geschlossen_pos": "Geschlossen (abends)",
+                "lueften_pos": "Lüften (Fenster gekippt)",
+                "geoeffnet_pos": "Geöffnet (Tür/Fenster offen)",
+                "pos_nach_komfort_oeffnen": "Nach Schließen der Tür (-1 = vorherige, -2 = Geöffnet-Position)"
+              }
+            },
+            "fenster": {
+              "name": "Fenster",
+              "data": {
+                "fenster": "Fensterkontakte bzw. Drehgriff",
+                "luft_fenster_offen": "Bei offenem Fenster auf Lüften/Geöffnet fahren",
+                "aussperrschutz": "Aussperrschutz (bei offener Tür nie herunterfahren)"
+              }
+            },
+            "abschattung": {
+              "name": "Abschattung",
+              "data": {
+                "abschattung": "Abschattung",
+                "helligkeitssensor": "Helligkeitssensor",
+                "himmelsrichtung": "Himmelsrichtung des Fensters (90 = Ost, 180 = Süd, 270 = West)",
+                "winkel_links": "Winkel links (Sonne vor dem Fenster)",
+                "winkel_rechts": "Winkel rechts (Sonne nach dem Fenster)",
+                "min_elevation": "Mindest-Sonnenhöhe",
+                "schwelle_sonnig": "Schwelle sonnig (abschatten ab)",
+                "schwelle_wolkig": "Schwelle wolkig (Ende unter)",
+                "min_temp_aussen": "Mindest-Außentemperatur",
+                "min_temp_vorhersage": "Nur abschatten, wenn heute mindestens erwartet (optional)",
+                "raumtemperatur": "Raumtemperatur (optional, Winter: Sonne heizt mit)",
+                "min_temp_innen": "Nur abschatten ab Raumtemperatur",
+                "abschattung_dynamisch": "Position nach Sonnenhöhe anpassen (dynamisch)",
+                "fensterhoehe": "Fensterhöhe (Öffnung)",
+                "bruestung": "Abstand Fenster–Boden (Brüstung)",
+                "eindringtiefe": "Sonne darf so weit in den Raum scheinen",
+                "abschattung_pos": "Abschattungsposition",
+                "pos_nach_abschattung": "Position nach der Abschattung (-1 = vorherige)",
+                "wartezeit": "Wartezeit zwischen Fahrten",
+                "sperrzeit_nach_manuell": "Sperrzeit nach manueller Fahrt",
+                "sperrzeit_vor_nacht": "Sperrzeit vor dem Schließen am Abend",
+                "schnell_oeffnen": "Nach Abschatten schnell wieder öffnen",
+                "schnell_schliessen": "Nach Öffnen schnell wieder abschatten"
+              }
+            }
+          }
+        }
+      },
+      "abort": {
+        "reconfigure_successful": "Gespeichert."
+      }
+    },
+    "helligkeit": {
+      "entry_type": "Helligkeitssensor",
+      "initiate_flow": {
+        "user": "Helligkeitssensor hinzufügen",
+        "reconfigure": "Helligkeitssensor bearbeiten"
+      },
+      "step": {
+        "user": {
+          "title": "Helligkeitssensor",
+          "data": {
+            "name": "Name",
+            "entity": "Sensor"
+          }
+        },
+        "reconfigure": {
+          "title": "Helligkeitssensor",
+          "data": {
+            "name": "Name",
+            "entity": "Sensor"
+          }
+        }
+      },
+      "abort": {
+        "reconfigure_successful": "Gespeichert."
+      }
+    }
+  },
+  "selector": {
+    "astro": {
+      "options": {
+        "real": "Sonnenauf-/-untergang",
+        "civil": "Bürgerliche Dämmerung",
+        "nautic": "Nautische Dämmerung",
+        "astronomic": "Astronomische Dämmerung",
+        "horizon": "Eigener Horizont"
+      }
+    },
+    "modus": {
+      "options": {
+        "immer": "Immer",
+        "bei_abwesenheit": "Nur wenn niemand zu Hause ist",
+        "bei_anwesenheit": "Nur wenn jemand zu Hause ist",
+        "aus": "Aus"
+      }
+    },
+    "zeitart": {
+      "options": {
+        "astro": "Sonnenstand (mit Grenzen)",
+        "zeit": "Feste Zeit"
+      }
+    },
+    "abschattung": {
+      "options": {
+        "nein": "Aus",
+        "ja": "Ein",
+        "verspaetet": "Ein, etwas verzögert",
+        "bei_abwesenheit": "Nur wenn niemand zu Hause ist",
+        "bei_anwesenheit": "Nur wenn jemand zu Hause ist"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "naechstes_oeffnen": {
+        "name": "Nächstes Öffnen"
+      },
+      "naechstes_schliessen": {
+        "name": "Nächstes Schließen"
+      },
+      "status": {
+        "name": "Status",
+        "state": {
+          "aus": "Aus",
+          "bereit": "Bereit",
+          "gesperrt": "Gesperrt (manuell gefahren)",
+          "vorgemerkt": "Abschattung vorgemerkt",
+          "abschattung": "Abgeschattet",
+          "ende_vorgemerkt": "Abschattungsende vorgemerkt",
+          "abschatten_nach_schliessen": "Abschatten nach Schließen der Tür",
+          "nachtschliessen": "Schließt, sobald Fenster zu",
+          "geoeffnet": "Geöffnet wegen offener Tür",
+          "lueften": "Lüften",
+          "party": "Wartet auf Party-Ende",
+          "schlaf": "Wartet aufs Aufstehen"
+        }
+      }
+    },
+    "switch": {
+      "auto_morgens": {
+        "name": "Automatik morgens"
+      },
+      "auto_abends": {
+        "name": "Automatik abends"
+      },
+      "auto_abschattung": {
+        "name": "Abschattung"
+      },
+      "auto_komfort": {
+        "name": "Komfort (Fenster)"
+      },
+      "auto_partymodus": {
+        "name": "Partymodus"
+      },
+      "auto_gast": {
+        "name": "Gast anwesend"
+      },
+      "automatik": {
+        "name": "Automatik"
+      }
+    }
+  },
+  "services": {
+    "neu_berechnen": {
+      "name": "Zeiten neu berechnen",
+      "description": "Berechnet die nächsten Öffnen- und Schließzeiten aller Rollläden neu."
+    },
+    "abschattung_pruefen": {
+      "name": "Abschattung jetzt prüfen",
+      "description": "Prüft die Abschattung sofort für alle Rollläden."
+    },
+    "alle_oeffnen": {
+      "name": "Alle öffnen",
+      "description": "Fährt jeden Rollladen auf seine eingestellte Offen-Position."
+    },
+    "alle_lueften": {
+      "name": "Alle lüften",
+      "description": "Fährt jeden Rollladen auf seine eingestellte Lüften-Position."
+    },
+    "alle_schliessen": {
+      "name": "Alle schließen",
+      "description": "Fährt jeden Rollladen auf seine eingestellte Geschlossen-Position."
+    }
+  }
+}

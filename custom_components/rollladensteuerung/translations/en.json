@@ -1,0 +1,368 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Shutter control",
+        "description": "Global settings. Add shutters and brightness sensors afterwards.",
+        "data": {
+          "anwesenheit": "Presence (on/home = someone at home)",
+          "temperatur": "Outdoor temperature",
+          "werktag": "Workday sensor",
+          "sonne": "Sun",
+          "astro_morgens": "Astro mode (morning)",
+          "horizont_morgens": "Horizon morning (custom horizon only)",
+          "astro_abends": "Astro mode (evening)",
+          "horizont_abends": "Horizon evening (custom horizon only)",
+          "frost_temp": "Frost protection temperature",
+          "helligkeit_min": "Check shading only above brightness",
+          "wetter": "Weather forecast (optional)",
+          "abstand_sekunden": "Delay between shutter moves"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Global settings",
+        "data": {
+          "anwesenheit": "Presence (on/home = someone at home)",
+          "temperatur": "Outdoor temperature",
+          "werktag": "Workday sensor",
+          "sonne": "Sun",
+          "astro_morgens": "Astro mode (morning)",
+          "horizont_morgens": "Horizon morning (custom horizon only)",
+          "astro_abends": "Astro mode (evening)",
+          "horizont_abends": "Horizon evening (custom horizon only)",
+          "frost_temp": "Frost protection temperature",
+          "helligkeit_min": "Check shading only above brightness",
+          "wetter": "Weather forecast (optional)",
+          "abstand_sekunden": "Delay between shutter moves"
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "rollladen": {
+      "entry_type": "Shutter",
+      "initiate_flow": {
+        "user": "Add shutter",
+        "reconfigure": "Edit shutter"
+      },
+      "step": {
+        "user": {
+          "title": "Shutter",
+          "data": {
+            "grundlagen": "Basics",
+            "zeiten": "Times",
+            "positionen": "Positions",
+            "fenster": "Window",
+            "abschattung": "Sun protection"
+          },
+          "sections": {
+            "grundlagen": {
+              "name": "Basics",
+              "data": {
+                "name": "Name",
+                "cover": "Cover",
+                "aktiv": "Automation active",
+                "modus_hoch": "Open automatically",
+                "modus_runter": "Close automatically",
+                "frostschutz": "Frost protection: don't open when freezing",
+                "gaestezimmer": "Guest room: don't open while guest present",
+                "partymodus": "Party mode: close after the party",
+                "schlaf": "Sleep switch (optional): open only once off"
+              }
+            },
+            "zeiten": {
+              "name": "Times",
+              "data": {
+                "hoch": "Open by",
+                "zeit_hoch_frueh": "Open earliest (workday)",
+                "zeit_hoch_spaet": "Open latest (workday)",
+                "zeit_hoch_we": "Open on weekends/holidays",
+                "offset_morgens": "Offset morning",
+                "runter": "Close by",
+                "zeit_runter_frueh": "Close earliest",
+                "zeit_runter_spaet": "Close latest",
+                "offset_abends": "Offset evening",
+                "zufall_minuten": "Random (± minutes)"
+              }
+            },
+            "positionen": {
+              "name": "Positions",
+              "data": {
+                "offen_pos": "Open (morning)",
+                "geschlossen_pos": "Closed (evening)",
+                "lueften_pos": "Ventilation (window tilted)",
+                "geoeffnet_pos": "Opened (door/window open)",
+                "pos_nach_komfort_oeffnen": "After door closes (-1 = previous, -2 = opened position)"
+              }
+            },
+            "fenster": {
+              "name": "Window",
+              "data": {
+                "fenster": "Window contacts or handle sensor",
+                "luft_fenster_offen": "Move to ventilation/opened when window opens",
+                "aussperrschutz": "Lock-out protection (never lower while door open)"
+              }
+            },
+            "abschattung": {
+              "name": "Sun protection",
+              "data": {
+                "abschattung": "Sun protection",
+                "helligkeitssensor": "Brightness sensor",
+                "himmelsrichtung": "Window direction (90 = east, 180 = south, 270 = west)",
+                "winkel_links": "Angle left (sun before window)",
+                "winkel_rechts": "Angle right (sun after window)",
+                "min_elevation": "Minimum sun elevation",
+                "schwelle_sonnig": "Sunny threshold (shade above)",
+                "schwelle_wolkig": "Cloudy threshold (end below)",
+                "min_temp_aussen": "Minimum outdoor temperature",
+                "min_temp_vorhersage": "Shade only if today's forecast reaches (optional)",
+                "raumtemperatur": "Room temperature (optional, winter sun heating)",
+                "min_temp_innen": "Shade only above room temperature",
+                "abschattung_dynamisch": "Adjust position to sun elevation (dynamic)",
+                "fensterhoehe": "Window height",
+                "bruestung": "Sill height above floor",
+                "eindringtiefe": "Allowed sun penetration into room",
+                "abschattung_pos": "Shading position",
+                "pos_nach_abschattung": "Position after shading (-1 = previous)",
+                "wartezeit": "Wait time between moves",
+                "sperrzeit_nach_manuell": "Lock time after manual move",
+                "sperrzeit_vor_nacht": "Lock time before evening close",
+                "schnell_oeffnen": "Open quickly after shading",
+                "schnell_schliessen": "Shade quickly after opening"
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Shutter",
+          "data": {
+            "grundlagen": "Basics",
+            "zeiten": "Times",
+            "positionen": "Positions",
+            "fenster": "Window",
+            "abschattung": "Sun protection"
+          },
+          "sections": {
+            "grundlagen": {
+              "name": "Basics",
+              "data": {
+                "name": "Name",
+                "cover": "Cover",
+                "aktiv": "Automation active",
+                "modus_hoch": "Open automatically",
+                "modus_runter": "Close automatically",
+                "frostschutz": "Frost protection: don't open when freezing",
+                "gaestezimmer": "Guest room: don't open while guest present",
+                "partymodus": "Party mode: close after the party",
+                "schlaf": "Sleep switch (optional): open only once off"
+              }
+            },
+            "zeiten": {
+              "name": "Times",
+              "data": {
+                "hoch": "Open by",
+                "zeit_hoch_frueh": "Open earliest (workday)",
+                "zeit_hoch_spaet": "Open latest (workday)",
+                "zeit_hoch_we": "Open on weekends/holidays",
+                "offset_morgens": "Offset morning",
+                "runter": "Close by",
+                "zeit_runter_frueh": "Close earliest",
+                "zeit_runter_spaet": "Close latest",
+                "offset_abends": "Offset evening",
+                "zufall_minuten": "Random (± minutes)"
+              }
+            },
+            "positionen": {
+              "name": "Positions",
+              "data": {
+                "offen_pos": "Open (morning)",
+                "geschlossen_pos": "Closed (evening)",
+                "lueften_pos": "Ventilation (window tilted)",
+                "geoeffnet_pos": "Opened (door/window open)",
+                "pos_nach_komfort_oeffnen": "After door closes (-1 = previous, -2 = opened position)"
+              }
+            },
+            "fenster": {
+              "name": "Window",
+              "data": {
+                "fenster": "Window contacts or handle sensor",
+                "luft_fenster_offen": "Move to ventilation/opened when window opens",
+                "aussperrschutz": "Lock-out protection (never lower while door open)"
+              }
+            },
+            "abschattung": {
+              "name": "Sun protection",
+              "data": {
+                "abschattung": "Sun protection",
+                "helligkeitssensor": "Brightness sensor",
+                "himmelsrichtung": "Window direction (90 = east, 180 = south, 270 = west)",
+                "winkel_links": "Angle left (sun before window)",
+                "winkel_rechts": "Angle right (sun after window)",
+                "min_elevation": "Minimum sun elevation",
+                "schwelle_sonnig": "Sunny threshold (shade above)",
+                "schwelle_wolkig": "Cloudy threshold (end below)",
+                "min_temp_aussen": "Minimum outdoor temperature",
+                "min_temp_vorhersage": "Shade only if today's forecast reaches (optional)",
+                "raumtemperatur": "Room temperature (optional, winter sun heating)",
+                "min_temp_innen": "Shade only above room temperature",
+                "abschattung_dynamisch": "Adjust position to sun elevation (dynamic)",
+                "fensterhoehe": "Window height",
+                "bruestung": "Sill height above floor",
+                "eindringtiefe": "Allowed sun penetration into room",
+                "abschattung_pos": "Shading position",
+                "pos_nach_abschattung": "Position after shading (-1 = previous)",
+                "wartezeit": "Wait time between moves",
+                "sperrzeit_nach_manuell": "Lock time after manual move",
+                "sperrzeit_vor_nacht": "Lock time before evening close",
+                "schnell_oeffnen": "Open quickly after shading",
+                "schnell_schliessen": "Shade quickly after opening"
+              }
+            }
+          }
+        }
+      },
+      "abort": {
+        "reconfigure_successful": "Saved."
+      }
+    },
+    "helligkeit": {
+      "entry_type": "Brightness sensor",
+      "initiate_flow": {
+        "user": "Add brightness sensor",
+        "reconfigure": "Edit brightness sensor"
+      },
+      "step": {
+        "user": {
+          "title": "Brightness sensor",
+          "data": {
+            "name": "Name",
+            "entity": "Sensor"
+          }
+        },
+        "reconfigure": {
+          "title": "Brightness sensor",
+          "data": {
+            "name": "Name",
+            "entity": "Sensor"
+          }
+        }
+      },
+      "abort": {
+        "reconfigure_successful": "Saved."
+      }
+    }
+  },
+  "selector": {
+    "astro": {
+      "options": {
+        "real": "Sunrise/sunset",
+        "civil": "Civil twilight",
+        "nautic": "Nautical twilight",
+        "astronomic": "Astronomical twilight",
+        "horizon": "Custom horizon"
+      }
+    },
+    "modus": {
+      "options": {
+        "immer": "Always",
+        "bei_abwesenheit": "Only when nobody is home",
+        "bei_anwesenheit": "Only when someone is home",
+        "aus": "Off"
+      }
+    },
+    "zeitart": {
+      "options": {
+        "astro": "Sun (with limits)",
+        "zeit": "Fixed time"
+      }
+    },
+    "abschattung": {
+      "options": {
+        "nein": "Off",
+        "ja": "On",
+        "verspaetet": "On, slightly delayed",
+        "bei_abwesenheit": "Only when nobody is home",
+        "bei_anwesenheit": "Only when someone is home"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "naechstes_oeffnen": {
+        "name": "Next opening"
+      },
+      "naechstes_schliessen": {
+        "name": "Next closing"
+      },
+      "status": {
+        "name": "Status",
+        "state": {
+          "aus": "Off",
+          "bereit": "Ready",
+          "gesperrt": "Locked (moved manually)",
+          "vorgemerkt": "Shading scheduled",
+          "abschattung": "Shaded",
+          "ende_vorgemerkt": "Shading end scheduled",
+          "abschatten_nach_schliessen": "Shade after door closes",
+          "nachtschliessen": "Closes once window is closed",
+          "geoeffnet": "Opened for open door",
+          "lueften": "Ventilating",
+          "party": "Waiting for party end",
+          "schlaf": "Waiting for wake-up"
+        }
+      }
+    },
+    "switch": {
+      "auto_morgens": {
+        "name": "Automatic morning"
+      },
+      "auto_abends": {
+        "name": "Automatic evening"
+      },
+      "auto_abschattung": {
+        "name": "Sun protection"
+      },
+      "auto_komfort": {
+        "name": "Comfort (windows)"
+      },
+      "auto_partymodus": {
+        "name": "Party mode"
+      },
+      "auto_gast": {
+        "name": "Guest present"
+      },
+      "automatik": {
+        "name": "Automation"
+      }
+    }
+  },
+  "services": {
+    "neu_berechnen": {
+      "name": "Recalculate times",
+      "description": "Recalculates next open/close times."
+    },
+    "abschattung_pruefen": {
+      "name": "Check sun protection now",
+      "description": "Runs the sun protection check now."
+    },
+    "alle_oeffnen": {
+      "name": "Open all",
+      "description": "Moves every shutter to its configured open position."
+    },
+    "alle_lueften": {
+      "name": "Ventilate all",
+      "description": "Moves every shutter to its ventilation position."
+    },
+    "alle_schliessen": {
+      "name": "Close all",
+      "description": "Moves every shutter to its configured closed position."
+    }
+  }
+}
