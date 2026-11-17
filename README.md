@@ -144,7 +144,7 @@ administrator account.
 | Section | Content | Settings |
 |---|---|---|
 | *Shutters (Rollladensteuerung)* | all shutters of one floor, sorted by name | floor (or *All shutters* / *without floor*), heading |
-| *Shutter control – automation* | central card with switches, all buttons and gear | heading, brightness history on/off |
+| *Shutter control – automation* | central card with switches, all buttons and gear, brightness history with the current sun position (direction and elevation) | heading, brightness history on/off |
 | *Shutter control – notifications* | push switches and log | heading |
 
 Move the sections around freely and mix them with your own cards; the layout is stored in your dashboard and survives

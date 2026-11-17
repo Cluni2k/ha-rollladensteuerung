@@ -2,13 +2,14 @@
  * Rollladensteuerung – Frontend
  *  - custom:rollladensteuerung-card          Rollladen mit Tasten, Regler, Automatik-Zeile und Zahnrad
  *  - custom:rollladensteuerung-zentrale-card Globale Schalter, nächste Zeiten, Alle öffnen/schließen, Zahnrad
+ *  - custom:rollladensteuerung-sonne-card    Sonnenstand als Textzeile (unter dem Helligkeitsverlauf)
  *  - Ansichts-/Dashboard-Vorlage (strategy) custom:rollladensteuerung – baut die Ansicht aus allen
  *    eingerichteten Rollläden (nach Stockwerk gruppiert), neue Rollläden erscheinen automatisch.
  *  - Abschnitts-Vorlagen (section strategies, ab HA 2026.11) für frei anordenbare Dashboards:
  *    custom:rollladensteuerung (Rollläden eines Stockwerks), custom:rollladensteuerung-steuerung,
  *    custom:rollladensteuerung-meldungen
  */
-const VERSION = "0.7.1";
+const VERSION = "0.7.2";
 
 const TEXTE = {
   de: {
@@ -31,7 +32,8 @@ const TEXTE = {
     protokoll: "Protokoll (14 Tage)", protokoll_anzeigen: "Protokoll anzeigen", protokoll_speichern: "Protokoll speichern",
     alle_rolllaeden: "Alle Rollläden", alle_arten: "Alle Arten", suchen: "Suchen …", zeit: "Zeit", rollladen: "Rollladen",
     art: "Art", meldung: "Meldung", eintraege: "Einträge",
-    f_stockwerk: "Stockwerk", f_titel: "Überschrift (leer = automatisch)", f_verlauf: "Helligkeitsverlauf anzeigen",
+    f_stockwerk: "Stockwerk", f_titel: "Überschrift (leer = automatisch)", f_verlauf: "Helligkeitsverlauf anzeigen", sonne_titel: "Sonne", sonne_hoehe: "Höhe", sonne_steigt: "steigt", sonne_sinkt: "sinkt", sonne_unter: "unter dem Horizont", sonne_stand: "Stand",
+    richtungen: "N,NNO,NO,ONO,O,OSO,SO,SSO,S,SSW,SW,WSW,W,WNW,NW,NNW",
     alle_stockwerke: "Alle Rollläden", ohne_stockwerk: "Rollläden ohne Stockwerk", stock_fehlt: "Dieses Stockwerk gibt es nicht mehr.",
     keine_rolllaeden: "Keine Rollläden in diesem Stockwerk.",
     v_rolllaeden: "Rollläden (Rollladensteuerung)", v_rolllaeden_text: "Alle Rollläden eines Stockwerks – neue erscheinen automatisch",
@@ -59,7 +61,8 @@ const TEXTE = {
     protokoll: "Log (14 days)", protokoll_anzeigen: "Show log", protokoll_speichern: "Save log",
     alle_rolllaeden: "All shutters", alle_arten: "All types", suchen: "Search …", zeit: "Time", rollladen: "Shutter",
     art: "Type", meldung: "Message", eintraege: "entries",
-    f_stockwerk: "Floor", f_titel: "Heading (empty = automatic)", f_verlauf: "Show brightness history",
+    f_stockwerk: "Floor", f_titel: "Heading (empty = automatic)", f_verlauf: "Show brightness history", sonne_titel: "Sun", sonne_hoehe: "elevation", sonne_steigt: "rising", sonne_sinkt: "setting", sonne_unter: "below the horizon", sonne_stand: "as of",
+    richtungen: "N,NNE,NE,ENE,E,ESE,SE,SSE,S,SSW,SW,WSW,W,WNW,NW,NNW",
     alle_stockwerke: "All shutters", ohne_stockwerk: "Shutters without floor", stock_fehlt: "This floor no longer exists.",
     keine_rolllaeden: "No shutters on this floor.",
     v_rolllaeden: "Shutters (Rollladensteuerung)", v_rolllaeden_text: "All shutters of a floor – new ones appear automatically",
@@ -695,6 +698,50 @@ class EinstellDialog extends HTMLElement {
 }
 
 
+/* ---------------------------------------------------------------- Sonnenstand (Text unter dem Helligkeitsverlauf) */
+// Zeigt die Werte, mit denen auch die Steuerung rechnet (Attribute von sun.sun). Home Assistant aktualisiert sie
+// tagsüber alle 2–4 Minuten, nachts alle 20 Minuten; die Karte zeichnet nur neu, wenn sich etwas geändert hat.
+class SonneKarte extends HTMLElement {
+  setConfig(config) { this._config = config || {}; }
+  getCardSize() { return 1; }
+  getGridOptions() { return { columns: "full", rows: "auto" }; }
+  set hass(hass) {
+    this._hass = hass;
+    const st = hass.states[this._config.entity || "sun.sun"];
+    const a = st?.attributes || {};
+    const schluessel = `${a.azimuth}|${a.elevation}|${a.rising}|${hass.language}`;
+    if (schluessel === this._zuletzt) return;
+    this._zuletzt = schluessel;
+    if (!this.shadowRoot) {
+      this.attachShadow({ mode: "open" }).innerHTML = `<style>
+        ha-card { padding: 10px 16px; display: flex; align-items: center; gap: 10px; color: var(--primary-text-color); }
+        ha-icon { color: var(--state-sun-above_horizon-color, var(--amber-color, #ffc107)); flex: none; }
+        .text { font-size: 14px; line-height: 1.4; }
+        small { color: var(--secondary-text-color); }
+      </style><ha-card><ha-icon></ha-icon><div class="text"></div></ha-card>`;
+    }
+    const icon = this.shadowRoot.querySelector("ha-icon");
+    const text = this.shadowRoot.querySelector(".text");
+    if (a.azimuth == null || a.elevation == null) {
+      icon.setAttribute("icon", "mdi:weather-sunny-off");
+      text.textContent = `${tx(hass, "sonne_titel")}: –`;
+      return;
+    }
+    const zahl = (v) => Number(v).toLocaleString(hass.language || undefined, { maximumFractionDigits: 1 });
+    const richtungen = tx(hass, "richtungen").split(",");
+    const richtung = richtungen[Math.round(((Number(a.azimuth) % 360) + 360) % 360 / 22.5) % 16];
+    const oben = Number(a.elevation) > 0;
+    icon.setAttribute("icon", oben ? "mdi:weather-sunny" : "mdi:weather-night");
+    const trend = a.rising == null ? "" : `, ${tx(hass, a.rising ? "sonne_steigt" : "sonne_sinkt")}`;
+    const stand = st.last_updated ? new Date(st.last_updated).toLocaleTimeString(hass.language || undefined,
+      { hour: "2-digit", minute: "2-digit" }) : "";
+    text.innerHTML = `<b>${esc(tx(hass, "sonne_titel"))}:</b> ${esc(richtung)} (${zahl(a.azimuth)}°) · `
+      + `${esc(tx(hass, "sonne_hoehe"))} ${zahl(a.elevation)}°${esc(trend)}`
+      + `${oben ? "" : ` <small>(${esc(tx(hass, "sonne_unter"))})</small>`}`
+      + `${stand ? ` <small>· ${esc(tx(hass, "sonne_stand"))} ${esc(stand)}</small>` : ""}`;
+  }
+}
+
 /* ---------------------------------------------------------------- Benachrichtigungen & Protokoll */
 const PUSH_SYMBOL = { push_oeffnen: "mdi:weather-sunset-up", push_schliessen: "mdi:weather-sunset-down",
   push_warnungen: "mdi:alert-outline", push_lueften: "mdi:window-open-variant", push_abschatten: "mdi:sun-angle",
@@ -934,6 +981,8 @@ function steuerungKarten(k, hass, config) {
   if (k.helligkeit.length && config.verlauf !== false) {
     karten.push({ type: "history-graph", hours_to_show: 24, grid_options: { columns: "full" },
       entities: k.helligkeit.map((s) => ({ entity: s.entity, name: s.name })) });
+    karten.push({ type: "custom:rollladensteuerung-sonne-card", entity: k.global?.daten?.sonne || "sun.sun",
+      grid_options: { columns: "full", rows: "auto" } });
   }
   return karten;
 }
@@ -1080,6 +1129,7 @@ definieren("rollladensteuerung-card", RollladenKarte);
 definieren("rollladensteuerung-zentrale-card", ZentraleKarte);
 definieren("rollladensteuerung-dialog", EinstellDialog);
 definieren("rollladensteuerung-meldungen-card", MeldungenKarte);
+definieren("rollladensteuerung-sonne-card", SonneKarte);
 definieren("rollladensteuerung-protokoll", ProtokollDialog);
 definieren("ll-strategy-view-rollladensteuerung", AnsichtVorlage);
 definieren("ll-strategy-dashboard-rollladensteuerung", DashboardVorlage);

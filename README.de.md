@@ -144,7 +144,7 @@ nur Administratoren.
 | Abschnitt | Inhalt | Einstellungen |
 |---|---|---|
 | *Rollläden (Rollladensteuerung)* | alle Rollläden eines Stockwerks, nach Namen sortiert | Stockwerk (oder *Alle Rollläden* / *ohne Stockwerk*), Überschrift |
-| *Rollladensteuerung – Automatik* | Zentrale mit Schaltern, Alle-Buttons und Zahnrad | Überschrift, Helligkeitsverlauf an/aus |
+| *Rollladensteuerung – Automatik* | Zentrale mit Schaltern, Alle-Buttons und Zahnrad, Helligkeitsverlauf mit aktuellem Sonnenstand (Richtung und Höhe) | Überschrift, Helligkeitsverlauf an/aus |
 | *Rollladensteuerung – Benachrichtigungen* | Push-Schalter und Protokoll | Überschrift |
 
 Die Abschnitte lassen sich frei verschieben und mit eigenen Karten mischen; die Anordnung liegt im eigenen Dashboard
