@@ -416,3 +416,16 @@ def test_fenster_waehrend_fahrt_ohne_eingriff():
     r = rl(lueften_pos=30)
     r.z.erwartet, r.z.erwartet_bis = 100, T0 + timedelta(minutes=3)
     assert r.fenster_event(umg(), core.Lage(0, faehrt=True, fenster=core.OFFEN)) == []
+
+
+def test_fenster_auf_in_der_pause_nach_dem_anhalten():
+    """Schlafzimmer 17.11., 22:10: zu während der Lüften-Fahrt (bei 29 % angehalten), in der Pause wieder auf –
+    der Rollladen soll auf Lüften bleiben, nicht nach unten fahren."""
+    r = rl(lueften_pos=30)
+    r.fenster_event(umg(), core.Lage(0, fenster=core.OFFEN))                        # auf → 30
+    f = r.fenster_event(umg(), core.Lage(0, faehrt=True, fenster=core.ZU))          # zu → anhalten, zurück auf 0
+    assert f[0].position == 0 and f[0].stoppen
+    f = r.fenster_event(umg(), core.Lage(29, fenster=core.OFFEN))                   # steht bei 29, Fahrt auf 0 steht aus
+    assert f[0].position == 30 and r.z.pos_vor_lueften == 0                         # neue Fahrt ersetzt die ausstehende
+    f = r.fenster_event(umg(), core.Lage(29, fenster=core.ZU))
+    assert f[0].position == 0

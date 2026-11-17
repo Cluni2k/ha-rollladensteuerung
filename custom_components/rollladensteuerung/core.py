@@ -296,10 +296,13 @@ class Rollladen:
         return [Fahrt(ziel, grund)]
 
     def _laufend(self, u: Umgebung, lage: Lage) -> int | None:
-        """Ziel der eigenen automatischen Fahrt, die gerade läuft (None = steht oder wird von Hand gefahren)."""
-        if not lage.faehrt or self.z.erwartet is None:
+        """Ziel der eigenen automatischen Fahrt, die gerade läuft oder noch aussteht (z. B. in der Pause nach
+        dem Anhalten). None = keine eigene Fahrt offen (Ziel erreicht, oder von Hand gefahren)."""
+        if self.z.erwartet is None:
             return None
         if self.z.erwartet_bis and u.jetzt > self.z.erwartet_bis:
+            return None
+        if not lage.faehrt and (lage.position is None or gleich(lage.position, self.z.erwartet)):
             return None
         return self.z.erwartet
 

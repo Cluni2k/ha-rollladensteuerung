@@ -118,6 +118,8 @@ class Steuerung:
         self._sende_sperre = asyncio.Lock()
         self._letzte_sendung = 0.0
         self._aufgaben: set[asyncio.Task] = set()
+        self._auftrag: dict[str, int] = {}      # laufende Nummer der neuesten Fahrt je Rollladen
+        self._gestoppt: dict[str, float] = {}   # wann zuletzt angehalten wurde (für die Pause)
         self._zeitbasis: dict[str, str] = {}   # Einstellungen, mit denen die geplanten Zeiten berechnet wurden
         self.protokoll = Protokoll(hass, entry.entry_id)
         self._tagesmeldung: dict[str, str] = {}   # Sammelmeldung Öffnen/Schließen nur einmal am Tag
@@ -338,7 +340,10 @@ class Steuerung:
     async def _ausfuehren(self, sid: str, fahrten: list[Fahrt]) -> None:
         """Fahrten einreihen – sie werden mit Abstand nacheinander gesendet (schont den Funk-Duty-Cycle)."""
         for f in fahrten:
-            aufgabe = self.hass.async_create_task(self._senden(sid, f))
+            # die neueste Fahrt gilt: noch nicht gesendete ältere Fahrten dieses Rollladens verfallen
+            nr = self._auftrag.get(sid, 0) + 1
+            self._auftrag[sid] = nr
+            aufgabe = self.hass.async_create_task(self._senden(sid, f, nr))
             self._aufgaben.add(aufgabe)
             aufgabe.add_done_callback(self._aufgaben.discard)
         self._verarbeiten(sid)
@@ -482,14 +487,20 @@ class Steuerung:
                 r._melde(WARNUNG, f"hat {ziel} % nicht erreicht (steht auf {pos} %)")
                 self._verarbeiten(sid)
 
-    async def _senden(self, sid: str, f: Fahrt) -> None:
+    async def _senden(self, sid: str, f: Fahrt, nr: int | None = None) -> None:
         r = self.rolllaeden.get(sid)
         if r is None:
             return
-        if not await self._bereit(r):
+
+        def ueberholt() -> bool:
+            return nr is not None and self._auftrag.get(sid) != nr
+
+        if not await self._bereit(r) or ueberholt():
             return
         if f.stoppen:
-            await self._anhalten(r)
+            await self._anhalten(sid, r)
+            if ueberholt():
+                return
         abstand = float(self.cfg.get(CONF_ABSTAND, 5))
         async with self._sende_sperre:
             if self.hass.is_stopping:
@@ -497,6 +508,8 @@ class Steuerung:
             warten = abstand - (time.monotonic() - self._letzte_sendung)
             if warten > 0:
                 await asyncio.sleep(warten)
+            if ueberholt():
+                return
             self._letzte_sendung = time.monotonic()
             r.z.erwartet_bis = dt_util.now() + timedelta(minutes=3)
             st = self.hass.states.get(r.e.cover)
@@ -513,18 +526,20 @@ class Steuerung:
             self.hass.bus.async_fire(EVENT_FAHRT, {"rollladen": r.e.name, "entity_id": r.e.cover,
                                                    "position": f.position, "grund": f.grund})
 
-    async def _anhalten(self, r: Rollladen) -> None:
+    async def _anhalten(self, sid: str, r: Rollladen) -> None:
         """Laufende Fahrt sofort anhalten (nicht hinter anderen Befehlen anstellen) und dem Motor eine Pause gönnen,
-        bevor es in die andere Richtung geht."""
+        bevor es in die andere Richtung geht – auch wenn er gerade eben erst angehalten wurde."""
         st = self.hass.states.get(r.e.cover)
-        if st is None or st.state not in ("opening", "closing") or self.hass.is_stopping:
+        if self.hass.is_stopping or st is None:
             return
         merkmale = st.attributes.get(ATTR_SUPPORTED_FEATURES, 0) or 0
-        if merkmale & CoverEntityFeature.STOP:
+        if st.state in ("opening", "closing") and merkmale & CoverEntityFeature.STOP:
             _LOGGER.info("%s: Fahrt angehalten", r.e.name)
             await self.hass.services.async_call("cover", "stop_cover", {"entity_id": r.e.cover}, blocking=False)
-            self._letzte_sendung = time.monotonic()
-        await asyncio.sleep(PAUSE_RICHTUNGSWECHSEL)
+            self._letzte_sendung = self._gestoppt[sid] = time.monotonic()
+        rest = PAUSE_RICHTUNGSWECHSEL - (time.monotonic() - self._gestoppt.get(sid, float("-inf")))
+        if rest > 0:
+            await asyncio.sleep(rest)
 
     async def _bereit(self, r: Rollladen) -> bool:
         """Nach einem Start warten, bis Home Assistant läuft und der Rollladen erreichbar ist (max. 5 Minuten).
