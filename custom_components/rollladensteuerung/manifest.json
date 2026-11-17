@@ -1,6 +1,9 @@
 {
   "domain": "rollladensteuerung",
   "name": "Rollladensteuerung",
+  "categories": [
+    "blinds_curtains"
+  ],
   "codeowners": [
     "@Cluni2k"
   ],
