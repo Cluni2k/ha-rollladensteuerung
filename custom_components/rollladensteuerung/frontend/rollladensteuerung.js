@@ -8,7 +8,7 @@
  *    custom:rollladensteuerung (Rollläden eines Stockwerks), custom:rollladensteuerung-steuerung,
  *    custom:rollladensteuerung-meldungen
  */
-const VERSION = "0.7.0";
+const VERSION = "0.7.1";
 
 const TEXTE = {
   de: {
@@ -524,11 +524,32 @@ class EinstellDialog extends HTMLElement {
       if (s.selector?.entity) {
         blockSchreiben();
         inhalt.appendChild(this._entitaetAuswahl(s, labels[s.name] || s.name));
+      } else if (s.selector?.time) {
+        blockSchreiben();
+        inhalt.appendChild(this._zeitFeld(s, labels[s.name] || s.name));
       } else {
         block.push(s);
       }
     }
     blockSchreiben();
+  }
+
+  // Uhrzeit als eigenes Feld – HAs Zeitauswahl wird im Dashboard-Dialog nicht zuverlässig nachgeladen.
+  _zeitFeld(s, label) {
+    const box = document.createElement("div");
+    box.className = "auswahl";
+    box.innerHTML = `<label>${esc(label)}${s.required ? " *" : ""}</label>
+      <div class="eingabe"><input type="time" step="1"></div>`;
+    const eingabe = box.querySelector("input");
+    const v = this._daten[s.name];
+    eingabe.value = typeof v === "string" ? (v.length === 5 ? `${v}:00` : v.slice(0, 8)) : "";
+    eingabe.addEventListener("change", () => {
+      const w = eingabe.value;
+      if (!w && s.required) { eingabe.setCustomValidity("?"); eingabe.reportValidity(); return; }
+      eingabe.setCustomValidity("");
+      this._daten = { ...this._daten, [s.name]: w ? (w.length === 5 ? `${w}:00` : w) : "" };
+    });
+    return box;
   }
 
   _entitaetAuswahl(s, label) {
