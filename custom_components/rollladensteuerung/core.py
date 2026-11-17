@@ -188,10 +188,39 @@ class Fahrt:
     grund: str
 
 
+# Arten von Meldungen (für Protokoll und Push)
+OEFFNEN, SCHLIESSEN, LUEFTEN, ABSCHATTEN, WARNUNG, MANUELL, FAHRT, INFO = (
+    "oeffnen", "schliessen", "lueften", "abschatten", "warnung", "manuell", "fahrt", "info")
+
+
+def kategorie(grund: str) -> str:
+    """Art einer Fahrt aus ihrem Grund ableiten."""
+    if grund.startswith("Alle"):
+        return FAHRT
+    if "bschatt" in grund:
+        return ABSCHATTEN
+    if grund.startswith("Morgens"):
+        return OEFFNEN
+    if grund.startswith(("Abends", "Partymodus")) or "Nachtschließen" in grund:
+        return SCHLIESSEN
+    if "Lüften" in grund or "Geöffnet" in grund or "zurück" in grund:
+        return LUEFTEN
+    return FAHRT
+
+
 @dataclass
 class Rollladen:
     e: Einstellungen
     z: Zustand = field(default_factory=Zustand)
+    meldungen: list = field(default_factory=list)   # (Art, Text, Ziel|None) – holt die Steuerung ab
+
+    def _melde(self, art: str, text: str, ziel: int | None = None) -> None:
+        self.z.letzte_meldung = text
+        self.meldungen.append((art, text, ziel))
+
+    def abholen(self) -> list:
+        m, self.meldungen = self.meldungen, []
+        return m
 
     # ------------------------------------------------------------------ Hilfen
     def _fenster(self, lage: Lage) -> str:
@@ -214,11 +243,11 @@ class Rollladen:
         # Aussperrschutz: bei offener Tür nie automatisch weiter herunterfahren
         if (self.e.aussperrschutz and lage.fenster not in (None, ZU)
                 and lage.position is not None and ziel < lage.position):
-            self.z.letzte_meldung = f"{grund}: wegen Aussperrschutz nicht gefahren (Tür offen)"
+            self._melde(WARNUNG, f"{grund}: wegen Aussperrschutz nicht gefahren (Tür offen)")
             return []
         self.z.erwartet = ziel
         self.z.erwartet_bis = u.jetzt + timedelta(minutes=3)
-        self.z.letzte_meldung = f"{grund} → {ziel} %"
+        self._melde(kategorie(grund), f"{grund} → {ziel} %", ziel)
         return [Fahrt(ziel, grund)]
 
     def schattenpos(self, u: Umgebung) -> int:
@@ -312,23 +341,23 @@ class Rollladen:
         if not u.auto_morgens or not self.e.aktiv:
             return []
         if self.e.modus_hoch == "aus":
-            self.z.letzte_meldung = "Öffnen: ausgeschaltet"
+            self._melde(INFO, "Öffnen: ausgeschaltet")
             return []
         if u.gast and self.e.gaestezimmer:
-            self.z.letzte_meldung = "Öffnen: Gast anwesend"
+            self._melde(INFO, "Öffnen: Gast anwesend")
             return []
         if lage.schlaeft:
             self.z.oeffnen_nachholen = True
-            self.z.letzte_meldung = "Öffnen: es wird noch geschlafen – öffnet beim Aufstehen"
+            self._melde(INFO, "Öffnen: es wird noch geschlafen – öffnet beim Aufstehen")
             return []
         if self.e.frostschutz and u.temperatur is not None and u.temperatur <= u.frost_temp:
-            self.z.letzte_meldung = f"Öffnen: Frostschutz ({u.temperatur:.1f} °C)"
+            self._melde(WARNUNG, f"Öffnen: Frostschutz ({u.temperatur:.1f} °C)")
             return []
         if not self._modus_passt(self.e.modus_hoch, u):
-            self.z.letzte_meldung = "Öffnen: Anwesenheit passt nicht"
+            self._melde(INFO, "Öffnen: Anwesenheit passt nicht")
             return []
         if lage.position is not None and lage.position >= self.e.offen_pos - TOLERANZ:
-            self.z.letzte_meldung = "Öffnen: steht schon höher"
+            self._melde(INFO, "Öffnen: steht schon höher")
             return []
         self.z.oeffnen_nachholen = False
         self._reset_abschattung()
@@ -352,13 +381,13 @@ class Rollladen:
             return []
         if self.e.partymodus and u.party:
             self.z.party_level = self.e.geschlossen_pos
-            self.z.letzte_meldung = "Schließen: Partymodus – wird danach nachgeholt"
+            self._melde(INFO, "Schließen: Partymodus – wird danach nachgeholt")
             return []
         if self.e.modus_runter == "aus":
-            self.z.letzte_meldung = "Schließen: ausgeschaltet"
+            self._melde(INFO, "Schließen: ausgeschaltet")
             return []
         if not self._modus_passt(self.e.modus_runter, u):
-            self.z.letzte_meldung = "Schließen: Anwesenheit passt nicht"
+            self._melde(INFO, "Schließen: Anwesenheit passt nicht")
             return []
         pos = lage.position
         fenster = self._fenster(lage)
@@ -367,7 +396,7 @@ class Rollladen:
             if pos is None or pos > self.e.geschlossen_pos + TOLERANZ:
                 self.z.pos_vor_geoeffnet = -1
                 return self._fahrt(u, lage, self.e.geschlossen_pos, "Abends schließen")
-            self.z.letzte_meldung = "Schließen: schon zu"
+            self._melde(INFO, "Schließen: schon zu")
             return []
         # Fenster/Tür nicht zu → nach dem Schließen nachholen
         self.z.nachtschliessen = True
@@ -378,7 +407,7 @@ class Rollladen:
             if pos is not None and pos > self.e.lueften_pos + TOLERANZ and not (
                     self.e.aussperrschutz and zweistufig_offen):
                 return self._fahrt(u, lage, self.e.lueften_pos, "Abends: Fenster offen → Lüften-Position")
-        self.z.letzte_meldung = "Schließen: wartet, bis das Fenster zu ist"
+        self._melde(WARNUNG, "Schließen: wartet, bis das Fenster zu ist")
         return []
 
     def party_ende(self, u: Umgebung, lage: Lage) -> list[Fahrt]:
@@ -473,7 +502,7 @@ class Rollladen:
         self.z.pos_vor_geoeffnet = -1
         self.z.pos_vor_lueften = -1
         self.z.nachtschliessen = False
-        self.z.letzte_meldung = f"Manuell auf {pos} % gefahren"
+        self._melde(MANUELL, f"Manuell auf {pos} % gefahren")
 
     # ------------------------------------------------------------------ Abschattung
     def im_bereich(self, u: Umgebung) -> bool:
@@ -501,7 +530,7 @@ class Rollladen:
         if gleich(lage.position, ziel_alt):
             self.z.zaehler_hoch += 1
             return self._fahrt(u, lage, ziel, grund)
-        self.z.letzte_meldung = f"{grund}: zwischendurch bewegt – bleibt stehen"
+        self._melde(INFO, f"{grund}: zwischendurch bewegt – bleibt stehen")
         return []
 
     def abschattung(self, u: Umgebung, lage: Lage) -> list[Fahrt]:
@@ -527,7 +556,7 @@ class Rollladen:
             if self.z.in_abschattung:
                 return self._abschattung_beenden(u, lage, f"Abschattung Ende ({kalt})")
             if self.z.abschatten_vorgemerkt:
-                self.z.letzte_meldung = f"Keine Abschattung: {kalt}"
+                self._melde(INFO, f"Keine Abschattung: {kalt}")
             self.z.abschatten_vorgemerkt = self.z.ende_vorgemerkt = False
             return []
         if modus == "bei_abwesenheit" and u.anwesend is True:
@@ -552,7 +581,7 @@ class Rollladen:
                 and (self.z.runter_zeit - u.jetzt).total_seconds() / 60 <= self.e.sperrzeit_vor_nacht):
             self._reset_abschattung()
             self.z.letzte_aktion = None
-            self.z.letzte_meldung = "Abschattung bleibt bis zum Schließen"
+            self._melde(INFO, "Abschattung bleibt bis zum Schließen")
             return []
 
         if self._minuten_seit(u, self.z.sperrzeitpunkt) <= self.e.sperrzeit_nach_manuell:
@@ -578,7 +607,7 @@ class Rollladen:
                 self.z.abschatten_vorgemerkt = True
                 self.z.ende_vorgemerkt = False
                 self.z.letzte_aktion = u.jetzt
-                self.z.letzte_meldung = "Abschatten vorgemerkt"
+                self._melde(INFO, "Abschatten vorgemerkt")
             elif self.z.pos_vor_geoeffnet != -1:
                 self.z.abschatten_vorgemerkt = True
                 self.z.ende_vorgemerkt = False
@@ -588,7 +617,7 @@ class Rollladen:
             self.z.ende_vorgemerkt = True
             self.z.abschatten_vorgemerkt = False
             self.z.letzte_aktion = u.jetzt
-            self.z.letzte_meldung = "Abschattungsende vorgemerkt"
+            self._melde(INFO, "Abschattungsende vorgemerkt")
             return []
 
         if self.z.abschatten_vorgemerkt and h >= self.e.schwelle_sonnig:
@@ -603,7 +632,7 @@ class Rollladen:
             if fenster == OFFEN and not self.z.abschatten_nach_schliessen:
                 self.z.abschatten_nach_schliessen = True
                 self.z.abschatten_vorgemerkt = False
-                self.z.letzte_meldung = "Abschatten, sobald die Tür zu ist"
+                self._melde(INFO, "Abschatten, sobald die Tür zu ist")
                 return []
             self.z.letzte_aktion = u.jetzt
             return []

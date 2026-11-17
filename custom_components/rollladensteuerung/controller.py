@@ -16,6 +16,7 @@ from homeassistant.const import ATTR_SUPPORTED_FEATURES, STATE_UNAVAILABLE, STAT
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import (
+    async_call_later,
     async_track_point_in_time,
     async_track_state_change_event,
     async_track_time_change,
@@ -40,6 +41,7 @@ from .const import (
     CONF_HELLIGKEITSSENSOR,
     CONF_HORIZONT_ABENDS,
     CONF_HORIZONT_MORGENS,
+    CONF_PUSH,
     CONF_RAUMTEMPERATUR,
     CONF_SCHLAF,
     CONF_SONNE,
@@ -48,16 +50,24 @@ from .const import (
     CONF_WETTER,
     DOMAIN,
     EVENT_FAHRT,
+    AUSFALL_MINUTEN,
     NACHT_RESET,
     SCHALTER_STANDARD,
     SIGNAL_UPDATE,
     SUB_HELLIGKEIT,
     SUB_ROLLLADEN,
 )
-from .core import GEKIPPT, OFFEN, ZU, Einstellungen, Fahrt, Lage, Rollladen, Umgebung, Zustand
+from .protokoll import Protokoll
+from .core import ABSCHATTEN, LUEFTEN, MANUELL, OEFFNEN, SCHLIESSEN, WARNUNG, GEKIPPT, OFFEN, ZU, Einstellungen, Fahrt, Lage, Rollladen, Umgebung, Zustand
 
 _LOGGER = logging.getLogger(__name__)
 _REIHENFOLGE = {ZU: 0, GEKIPPT: 1, OFFEN: 2}
+SCHALTER_NAMEN = {"morgens": "Automatik morgens", "abends": "Automatik abends", "abschattung": "Abschattung",
+                  "komfort": "Komfort (Fenster)", "partymodus": "Partymodus", "gast": "Gast anwesend",
+                  "push_oeffnen": "Push Öffnen", "push_schliessen": "Push Schließen",
+                  "push_warnungen": "Push Warnhinweise", "push_lueften": "Push Lüften",
+                  "push_abschatten": "Push Abschatten", "push_funktionen": "Push Funktionen",
+                  "push_manuell": "Push manuelle Fahrten"}
 _DREHGRIFF = {"closed": ZU, "geschlossen": ZU, "tilted": GEKIPPT, "gekippt": GEKIPPT,
               "open": OFFEN, "offen": OFFEN, "geoeffnet": OFFEN, "geöffnet": OFFEN}
 
@@ -98,6 +108,10 @@ class Steuerung:
         self._letzte_sendung = 0.0
         self._aufgaben: set[asyncio.Task] = set()
         self._zeitbasis: dict[str, str] = {}   # Einstellungen, mit denen die geplanten Zeiten berechnet wurden
+        self.protokoll = Protokoll(hass, entry.entry_id)
+        self._tagesmeldung: dict[str, str] = {}   # Sammelmeldung Öffnen/Schließen nur einmal am Tag
+        self._ausfall: dict[str, Any] = {}        # Entität → Abmelde-Funktion des 15-Minuten-Timers
+        self._gewarnt: dict[str, str] = {}        # Entität → Datum der letzten Ausfall-Warnung
 
         hell = {sid: s.data.get(CONF_ENTITY) for sid, s in entry.subentries.items()
                 if s.subentry_type == SUB_HELLIGKEIT}
@@ -121,6 +135,8 @@ class Steuerung:
             self.aktiv[sid] = (daten.get("aktiv") or {}).get(sid, self.aktiv[sid])
             self._zeitbasis[sid] = (daten.get("zeitbasis") or {}).get(sid, "")
             r.e.aktiv = self.aktiv[sid]
+        self._tagesmeldung = dict(daten.get("tagesmeldung") or {})
+        self._gewarnt = dict(daten.get("gewarnt") or {})
 
         covers = [r.e.cover for r in self.rolllaeden.values()]
         fenster = sorted({f for liste in self.fenster.values() for f in liste})
@@ -141,6 +157,15 @@ class Steuerung:
             self.hass, self._nacht, hour=NACHT_RESET[0], minute=NACHT_RESET[1], second=NACHT_RESET[2]))
         self._abmelden.append(async_track_time_interval(
             self.hass, self._abschattung_takt, timedelta(minutes=ABSCHATTUNG_INTERVALL_MIN)))
+        # Erreichbarkeit aller beteiligten Sensoren und Rollläden überwachen
+        ueberwacht = self._ueberwachte()
+        if ueberwacht:
+            self._abmelden.append(async_track_state_change_event(self.hass, list(ueberwacht), self._erreichbarkeit))
+            for eid in ueberwacht:
+                st = self.hass.states.get(eid)
+                if st is None or st.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+                    self._ausfall_beginnt(eid)
+        self.protokoll.eintragen("Zentrale", "info", f"Steuerung gestartet ({len(self.rolllaeden)} Rollläden)")
         for sid in self.rolllaeden:
             # nach einem Neustart die geplanten Zeiten behalten – nach geänderten Einstellungen neu rechnen
             await self.async_zeiten_planen(sid, behalten=self._zeitbasis.get(sid) == self._basis(sid))
@@ -149,6 +174,10 @@ class Steuerung:
     async def async_stop(self) -> None:
         for aufgabe in list(self._aufgaben):
             aufgabe.cancel()
+        for ab in self._ausfall.values():
+            if ab:
+                ab()
+        self._ausfall.clear()
         for ab in self._abmelden:
             ab()
         self._abmelden.clear()
@@ -167,6 +196,7 @@ class Steuerung:
 
     def _daten(self) -> dict:
         return {"schalter": self.schalter, "aktiv": self.aktiv, "zeitbasis": self._zeitbasis,
+                "tagesmeldung": self._tagesmeldung, "gewarnt": self._gewarnt,
                 "rolllaeden": {sid: r.z.speichern() for sid, r in self.rolllaeden.items()}}
 
     @callback
@@ -232,7 +262,146 @@ class Steuerung:
             aufgabe = self.hass.async_create_task(self._senden(sid, f))
             self._aufgaben.add(aufgabe)
             aufgabe.add_done_callback(self._aufgaben.discard)
+        self._verarbeiten(sid)
         self._melden()
+
+    # ------------------------------------------------------------------ Protokoll und Push
+    @callback
+    def _verarbeiten(self, sid: str) -> None:
+        """Meldungen der Logik ins Protokoll schreiben und – je nach Push-Schalter – verschicken."""
+        r = self.rolllaeden.get(sid)
+        if r is None:
+            return
+        for art, text, _ziel in r.abholen():
+            self.protokoll.eintragen(r.e.name, art, text)
+            if art == LUEFTEN and self.schalter["push_lueften"]:
+                self._push(f"{r.e.name}: {text}")
+            elif art == ABSCHATTEN and self.schalter["push_abschatten"] and "→" in text:
+                self._push(f"{r.e.name}: {text}")
+            elif art == WARNUNG and self.schalter["push_warnungen"]:
+                self._push(f"⚠️ {r.e.name}: {text}")
+            elif art == MANUELL and self.schalter["push_manuell"]:
+                self._push(f"{r.e.name}: {text}")
+            elif art in (OEFFNEN, SCHLIESSEN) and "→" in text:
+                self._sammelmeldung(art)
+
+    @callback
+    def _sammelmeldung(self, art: str) -> None:
+        """Öffnen/Schließen: eine Nachricht für alle Rollläden, beim ersten Rollladen des Tages."""
+        heute = dt_util.now().date().isoformat()
+        schalter = "push_oeffnen" if art == OEFFNEN else "push_schliessen"
+        if self._tagesmeldung.get(art) == heute:
+            return
+        self._tagesmeldung[art] = heute
+        if not self.schalter[schalter]:
+            return
+        feld, modus = ("hoch_zeit", "modus_hoch") if art == OEFFNEN else ("runter_zeit", "modus_runter")
+        jetzt = dt_util.now()
+        zeiten = [getattr(x.z, feld) for sid, x in self.rolllaeden.items()
+                  if self.aktiv.get(sid) and getattr(x.e, modus) != "aus" and getattr(x.z, feld)
+                  and getattr(x.z, feld).date() == jetzt.date()]
+        bis = max(zeiten, default=jetzt)
+        anzahl = max(len(zeiten), 1)
+        if art == OEFFNEN:
+            text = f"Die Rollläden werden geöffnet ({anzahl} Rollläden, bis ca. {bis:%H:%M} Uhr)."
+        else:
+            text = f"Die Rollläden werden geschlossen ({anzahl} Rollläden, bis ca. {bis:%H:%M} Uhr)."
+        self._push(text)
+
+    @callback
+    def _push(self, text: str) -> None:
+        dienst = self.cfg.get(CONF_PUSH)
+        if not dienst or "." not in dienst:
+            return
+        domain, name = dienst.split(".", 1)
+        daten = {"title": "Rollladensteuerung", "message": text}
+
+        async def _senden() -> None:
+            try:
+                await self.hass.services.async_call(domain, name, daten, blocking=False)
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning("Push über %s fehlgeschlagen: %s", dienst, err)
+        self.hass.async_create_task(_senden())
+
+    @callback
+    def funktion(self, text: str, rollladen: str = "Zentrale", push: bool = True) -> None:
+        self.protokoll.eintragen(rollladen, "funktion", text)
+        if push and self.schalter["push_funktionen"]:
+            self._push(text if rollladen == "Zentrale" else f"{rollladen}: {text}")
+
+    # ------------------------------------------------------------------ Erreichbarkeit
+    def _ueberwachte(self) -> dict[str, str]:
+        """Entität → wofür sie gebraucht wird (für die Warnung)."""
+        aus: dict[str, str] = {}
+        for sid, r in self.rolllaeden.items():
+            aus[r.e.cover] = f"Rollladen {r.e.name}"
+            for f in self.fenster.get(sid, []):
+                aus.setdefault(f, f"Fensterkontakt ({r.e.name})")
+            for eid, was in ((self.helligkeit.get(sid), "Helligkeitssensor"), (self.raum.get(sid), "Raumtemperatur"),
+                             (self.schlaf.get(sid), "Schlafschalter")):
+                if eid:
+                    aus.setdefault(eid, f"{was} ({r.e.name})" if was != "Helligkeitssensor" else was)
+        if t := self.cfg.get(CONF_TEMPERATUR):
+            aus.setdefault(t, "Außentemperatur")
+        return aus
+
+    def _name(self, eid: str) -> str:
+        st = self.hass.states.get(eid)
+        return (st.attributes.get("friendly_name") if st else None) or eid
+
+    @callback
+    def _ausfall_beginnt(self, eid: str) -> None:
+        if eid in self._ausfall:
+            return
+
+        @callback
+        def _pruefen(_now) -> None:
+            self._ausfall[eid] = None
+            st = self.hass.states.get(eid)
+            if st is not None and st.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+                return
+            was = self._ueberwachte().get(eid, eid)
+            text = f"{was} „{self._name(eid)}“ ist seit {AUSFALL_MINUTEN} Minuten nicht erreichbar."
+            self.protokoll.eintragen("Zentrale", WARNUNG, text)
+            heute = dt_util.now().date().isoformat()
+            if self._gewarnt.get(eid) != heute:   # höchstens eine Warnung pro Tag und Entität
+                self._gewarnt[eid] = heute
+                if self.schalter["push_warnungen"]:
+                    self._push(f"⚠️ {text}")
+                self._speichern()
+        self._ausfall[eid] = async_call_later(self.hass, AUSFALL_MINUTEN * 60, _pruefen)
+
+    async def _erreichbarkeit(self, event: Event) -> None:
+        eid = event.data["entity_id"]
+        neu = event.data.get("new_state")
+        weg = neu is None or neu.state in (STATE_UNKNOWN, STATE_UNAVAILABLE)
+        if weg:
+            self._ausfall_beginnt(eid)
+            return
+        if eid in self._ausfall:
+            ab = self._ausfall.pop(eid)
+            if ab:
+                ab()   # kam innerhalb der 15 Minuten zurück – keine Meldung
+            elif self._gewarnt.get(eid):
+                text = f"{self._ueberwachte().get(eid, eid)} „{self._name(eid)}“ ist wieder erreichbar."
+                self.protokoll.eintragen("Zentrale", "info", text)
+                if self.schalter["push_warnungen"]:
+                    self._push(text)
+                self._gewarnt.pop(eid, None)
+                self._speichern()
+
+    @callback
+    def _ziele_pruefen(self) -> None:
+        """Hat ein Rollladen sein Ziel nicht erreicht (Funkstörung, Hindernis, Aktor)? Dann warnen."""
+        jetzt = dt_util.now()
+        for sid, r in self.rolllaeden.items():
+            if r.z.erwartet is None or r.z.erwartet_bis is None or jetzt <= r.z.erwartet_bis + timedelta(minutes=1):
+                continue
+            ziel, r.z.erwartet = r.z.erwartet, None
+            pos = self.lage(sid).position
+            if pos is not None and abs(pos - ziel) > 5:
+                r._melde(WARNUNG, f"hat {ziel} % nicht erreicht (steht auf {pos} %)")
+                self._verarbeiten(sid)
 
     async def _senden(self, sid: str, f: Fahrt) -> None:
         r = self.rolllaeden.get(sid)
@@ -352,6 +521,7 @@ class Steuerung:
     async def _nacht(self, _now: datetime) -> None:
         for r in self.rolllaeden.values():
             r.nacht_reset()
+        await self.protokoll.bereinigen()
         await self.async_alle_neu_planen()
 
     # ------------------------------------------------------------------ Ereignisse
@@ -373,6 +543,7 @@ class Steuerung:
         for sid, r in self.rolllaeden.items():
             if r.e.cover == neu.entity_id:
                 r.positionsmeldung(u, pos_neu)
+                self._verarbeiten(sid)
         self._melden()
 
     async def _fenster_geaendert(self, event: Event) -> None:
@@ -394,6 +565,7 @@ class Steuerung:
         await self.async_abschattung()
 
     async def _abschattung_takt(self, _now: datetime) -> None:
+        self._ziele_pruefen()
         await self.async_abschattung()
 
     async def async_abschattung(self) -> None:
@@ -409,6 +581,11 @@ class Steuerung:
     async def async_schalter(self, name: str, wert: bool) -> None:
         alt = self.schalter.get(name)
         self.schalter[name] = wert
+        if alt != wert:
+            bezeichnung = SCHALTER_NAMEN.get(name, name)
+            # Push-Schalter selbst nur protokollieren, alle anderen Funktionen auch melden
+            self.funktion(f"{bezeichnung} {'eingeschaltet' if wert else 'ausgeschaltet'}",
+                          push=not name.startswith("push_"))
         if name == "partymodus" and alt and not wert:
             u = self.umgebung()
             for sid, r in self.rolllaeden.items():
@@ -464,6 +641,8 @@ class Steuerung:
         self._melden()
 
     async def async_rollladen_aktiv(self, sid: str, wert: bool) -> None:
+        if self.aktiv.get(sid) != wert:
+            self.funktion(f"Automatik {'eingeschaltet' if wert else 'ausgeschaltet'}", self.rolllaeden[sid].e.name)
         self.aktiv[sid] = wert
         self.rolllaeden[sid].e.aktiv = wert
         self._melden()

@@ -257,3 +257,31 @@ def test_dynamisch_nachfuehren():
     r.z.pos_vor_abschattung = 100
     f = r.abschattung(umg(azimut=180, elevation=45, temperatur=25), core.Lage(20, helligkeit=90000))
     assert f[0].position == 45 and r.z.abschattung_ziel == 45
+
+
+def test_meldungen_mit_art():
+    r = rl(frostschutz=True)
+    r.oeffnen(umg(temperatur=-3, frost_temp=0), core.Lage(0))
+    assert r.abholen() == [(core.WARNUNG, "Öffnen: Frostschutz (-3.0 °C)", None)]
+    r = rl(lueften_pos=30)
+    r.fenster_event(umg(), core.Lage(0, fenster=core.OFFEN))
+    assert r.abholen()[0][:1] == (core.LUEFTEN,)
+    r.positionsmeldung(umg(T0 + timedelta(minutes=10)), 55)
+    assert r.abholen()[0][0] == core.MANUELL
+    assert r.abholen() == []
+
+
+def test_kategorien():
+    assert core.kategorie("Morgens öffnen") == core.OEFFNEN
+    assert core.kategorie("Abends schließen") == core.SCHLIESSEN
+    assert core.kategorie("Fenster zu → Nachtschließen") == core.SCHLIESSEN
+    assert core.kategorie("Abschattung Ende (Wolken)") == core.ABSCHATTEN
+    assert core.kategorie("Fenster offen → Lüften-Position") == core.LUEFTEN
+    assert core.kategorie("Tür zu → zurück") == core.LUEFTEN
+    assert core.kategorie("Alle abschatten") == core.FAHRT
+
+
+def test_schliessen_bei_offenem_fenster_warnt():
+    r = rl()
+    r.schliessen(umg(), core.Lage(10, fenster=core.OFFEN))
+    assert any(a == core.WARNUNG for a, _, _ in r.abholen())

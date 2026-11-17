@@ -16,7 +16,8 @@
           "frost_temp": "Frostschutz-Temperatur",
           "helligkeit_min": "Abschattung erst prüfen ab Helligkeit",
           "wetter": "Wettervorhersage (optional, für „heute erwartet“)",
-          "abstand_sekunden": "Abstand zwischen Rollladenfahrten (schont den Funk-Duty-Cycle)"
+          "abstand_sekunden": "Abstand zwischen Rollladenfahrten (schont den Funk-Duty-Cycle)",
+          "push_dienst": "Push-Dienst (HA-App, Pushover …; ein Skript mit title/message lässt sich eintippen)"
         }
       }
     },
@@ -40,7 +41,8 @@
           "frost_temp": "Frostschutz-Temperatur",
           "helligkeit_min": "Abschattung erst prüfen ab Helligkeit",
           "wetter": "Wettervorhersage (optional, für „heute erwartet“)",
-          "abstand_sekunden": "Abstand zwischen Rollladenfahrten (schont den Funk-Duty-Cycle)"
+          "abstand_sekunden": "Abstand zwischen Rollladenfahrten (schont den Funk-Duty-Cycle)",
+          "push_dienst": "Push-Dienst (HA-App, Pushover …; ein Skript mit title/message lässt sich eintippen)"
         }
       }
     }
@@ -340,6 +342,27 @@
       },
       "automatik": {
         "name": "Automatik"
+      },
+      "auto_push_oeffnen": {
+        "name": "Push Öffnen"
+      },
+      "auto_push_schliessen": {
+        "name": "Push Schließen"
+      },
+      "auto_push_warnungen": {
+        "name": "Push Warnhinweise"
+      },
+      "auto_push_lueften": {
+        "name": "Push Lüften"
+      },
+      "auto_push_abschatten": {
+        "name": "Push Abschatten"
+      },
+      "auto_push_funktionen": {
+        "name": "Push Funktionen"
+      },
+      "auto_push_manuell": {
+        "name": "Push manuelle Fahrten"
       }
     }
   },

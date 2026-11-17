@@ -37,6 +37,15 @@ Alles wird in der Oberfläche eingestellt, ein passendes Dashboard ist dabei.
   nur, wenn zwischendurch niemand gefahren ist.
 - Steht Abschattung an, während die Tür offen ist, wird **nach dem Schließen der Tür** abgeschattet.
 
+**Benachrichtigungen und Protokoll**
+- **Push-Dienst** wählbar (HA-App, Pushover, … – jeder `notify`-Dienst; ein Skript mit `title`/`message` lässt sich eintippen).
+- Schalter, was als Push kommen soll: **Öffnen gestartet** und **Schließen gestartet** (eine Nachricht für alle Rollläden),
+  **Warnhinweise** (wegen Frost nicht geöffnet, Fenster beim Schließen offen, Aussperrschutz, Sensor oder Rollladen
+  15 Minuten nicht erreichbar, Zielposition nicht erreicht), **Lüften**, **Abschatten** (Anfang und Ende),
+  **Funktionen** (Automatik ein/aus) und **manuelle Fahrten**.
+- **Protokoll der letzten 14 Tage** mit allen Aktionen – automatische und manuelle Fahrten, ausgelassene Fahrten mit Grund,
+  geschaltete Funktionen, Warnungen – im Dashboard ansehen, filtern und als CSV speichern.
+
 **Allgemein**
 - **Gestaffelte Fahrten** mit einstellbarem Abstand (schont z. B. den Homematic-Duty-Cycle) – auch bei
   **Alle öffnen / lüften / abschatten / schließen**, jeder Rollladen auf seine eigene Position.
@@ -106,6 +115,11 @@ type: custom:rollladensteuerung-zentrale-card
 Das Zahnrad auf einer Rollladen-Karte öffnet einen Dialog mit den Karteikarten *Status, Grundlagen, Zeiten,
 Positionen, Fenster, Abschattung*. Das Zahnrad der Zentrale öffnet die Haupteinstellungen. Ändern dürfen
 nur Administratoren.
+
+**Selbst anordnen:** Ein Dashboard aus der Vorlage wird erzeugt und ist deshalb schreibgeschützt. Wer die Karten selbst
+anordnen möchte, wählt beim Bearbeiten *Kontrolle übernehmen* (⋮-Menü) oder baut die Ansicht aus den einzelnen Karten.
+Die Anordnung liegt dann im eigenen Dashboard und übersteht Updates der Integration; neue Rollläden fügt man dann von
+Hand hinzu (Karte *Rollladen (Rollladensteuerung)*).
 
 ## Einstellungen je Rollladen
 

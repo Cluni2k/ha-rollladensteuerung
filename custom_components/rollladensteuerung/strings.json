@@ -16,7 +16,8 @@
           "frost_temp": "Frost protection temperature",
           "helligkeit_min": "Check shading only above brightness",
           "wetter": "Weather forecast (optional)",
-          "abstand_sekunden": "Delay between shutter moves"
+          "abstand_sekunden": "Delay between shutter moves",
+          "push_dienst": "Push service (HA app, Pushover …; a script with title/message can be typed in)"
         }
       }
     },
@@ -40,7 +41,8 @@
           "frost_temp": "Frost protection temperature",
           "helligkeit_min": "Check shading only above brightness",
           "wetter": "Weather forecast (optional)",
-          "abstand_sekunden": "Delay between shutter moves"
+          "abstand_sekunden": "Delay between shutter moves",
+          "push_dienst": "Push service (HA app, Pushover …; a script with title/message can be typed in)"
         }
       }
     }
@@ -340,6 +342,27 @@
       },
       "automatik": {
         "name": "Automation"
+      },
+      "auto_push_oeffnen": {
+        "name": "Push opening"
+      },
+      "auto_push_schliessen": {
+        "name": "Push closing"
+      },
+      "auto_push_warnungen": {
+        "name": "Push warnings"
+      },
+      "auto_push_lueften": {
+        "name": "Push ventilation"
+      },
+      "auto_push_abschatten": {
+        "name": "Push shading"
+      },
+      "auto_push_funktionen": {
+        "name": "Push functions"
+      },
+      "auto_push_manuell": {
+        "name": "Push manual moves"
       }
     }
   },

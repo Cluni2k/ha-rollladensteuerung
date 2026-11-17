@@ -16,7 +16,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 
 from .config_flow import global_schema, rollladen_schema
-from .const import DOMAIN, SCHALTER, SUB_HELLIGKEIT, SUB_ROLLLADEN
+from .const import CONF_PUSH, DOMAIN, PUSH, SCHALTER, SUB_HELLIGKEIT, SUB_ROLLLADEN
 from .felder import GLOBAL_STANDARD, OPTIONAL, STANDARD, TABS, bereinigen, global_felder, rollladen_felder
 
 _TEXTE: dict[str, dict] = {}
@@ -38,6 +38,7 @@ def async_registrieren(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_konfig)
     websocket_api.async_register_command(hass, ws_rollladen_speichern)
     websocket_api.async_register_command(hass, ws_global_speichern)
+    websocket_api.async_register_command(hass, ws_protokoll)
 
 
 def _eintrag(hass: HomeAssistant):
@@ -87,6 +88,7 @@ async def ws_konfig(hass: HomeAssistant, connection: websocket_api.ActiveConnect
     zentrale = {k: eid("switch", f"{entry.entry_id}_auto_{k}") for k in SCHALTER}
     zentrale["oeffnen"] = eid("sensor", f"{entry.entry_id}_naechstes_oeffnen")
     zentrale["schliessen"] = eid("sensor", f"{entry.entry_id}_naechstes_schliessen")
+    push = {k: eid("switch", f"{entry.entry_id}_auto_{k}") for k in PUSH}
     connection.send_result(msg["id"], {
         "entry_id": entry.entry_id,
         "tabs": [{"key": tab, "titel": abschnitte[tab]["name"], "schema": schema(felder[tab])} for tab in TABS],
@@ -99,7 +101,21 @@ async def ws_konfig(hass: HomeAssistant, connection: websocket_api.ActiveConnect
         "helligkeit": [{"sid": sid, "name": s.title, "entity": s.data.get("entity")}
                        for sid, s in entry.subentries.items() if s.subentry_type == SUB_HELLIGKEIT],
         "zentrale": zentrale,
+        "push": push,
+        "push_dienst": {**entry.data, **entry.options}.get(CONF_PUSH) or "",
     })
+
+
+@websocket_api.websocket_command({vol.Required("type"): "rollladensteuerung/protokoll",
+                                  vol.Optional("tage", default=14): int})
+@websocket_api.async_response
+async def ws_protokoll(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    entry = _eintrag(hass)
+    if entry is None:
+        connection.send_error(msg["id"], "nicht_geladen", "Rollladensteuerung ist nicht eingerichtet")
+        return
+    eintraege = await entry.runtime_data.protokoll.lesen(msg["tage"])
+    connection.send_result(msg["id"], {"eintraege": list(reversed(eintraege))})
 
 
 @websocket_api.require_admin

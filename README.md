@@ -40,6 +40,15 @@ integration – configured entirely in the UI, with its own dashboard.
   only if the shutter was not moved in between.
 - If shading is due while the door is open, the shutter shades **after the door is closed**.
 
+**Notifications and log**
+- Choose a **push service** (HA companion app, Pushover, … – any `notify` service; a script with `title`/`message` can be typed in).
+- Switches for what you want as push: **opening started** and **closing started** (one message for all shutters),
+  **warnings** (not opened because of frost, window still open at closing time, lock-out protection, a sensor or shutter
+  unreachable for 15 minutes, a shutter that did not reach its target position), **ventilation**, **shading** (start and end),
+  **functions** (automation switched on/off) and **manual moves**.
+- A **log of the last 14 days** with all actions – automatic and manual moves, skipped moves and why, switched functions,
+  warnings – viewable and filterable on the dashboard and downloadable as CSV.
+
 **General**
 - **Staggered commands** with an adjustable delay (protects e.g. the Homematic duty cycle) – also for
   **open all / ventilate all / shade all / close all**, each shutter to its own configured position.
@@ -107,6 +116,11 @@ type: custom:rollladensteuerung-zentrale-card
 The gear on a shutter card opens a dialog with the tabs *Status, Basics, Times, Positions, Window,
 Sun protection*. The gear on the central card opens the global settings. Changing settings requires an
 administrator account.
+
+**Arranging it yourself:** a dashboard built by the strategy is generated and therefore read-only. To arrange the cards
+yourself, use *Take control* (⋮ menu when editing) or build the view from the single cards. The layout is then stored in
+your dashboard and survives updates of the integration; new shutters have to be added by hand (card *Rollladen
+(Rollladensteuerung)*).
 
 ## Settings reference (per shutter)
 

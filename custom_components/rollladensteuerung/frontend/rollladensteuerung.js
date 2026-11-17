@@ -5,7 +5,7 @@
  *  - Ansichts-/Dashboard-Vorlage (strategy) custom:rollladensteuerung – baut die Ansicht aus allen
  *    eingerichteten Rollläden (nach Stockwerk gruppiert), neue Rollläden erscheinen automatisch.
  */
-const VERSION = "0.3.4";
+const VERSION = "0.4.0";
 
 const TEXTE = {
   de: {
@@ -23,7 +23,11 @@ const TEXTE = {
     zaehler_gestern: "Abschattungsfahrten gestern", ja: "ja", nein: "nein", unbekannt: "–",
     offen: "offen", zu: "zu", gekippt: "gekippt", laedt: "Lädt …", naechstes_oeffnen: "Nächstes Öffnen",
     naechstes_schliessen: "Nächstes Schließen", keine_konfig: "Rollladensteuerung ist nicht eingerichtet.",
-    nur_admin: "Nur Administratoren können Einstellungen ändern.", aus: "aus", auswaehlen: "Entität wählen oder tippen …", entfernen: "Entfernen",
+    nur_admin: "Nur Administratoren können Einstellungen ändern.", aus: "aus", auswaehlen: "Entität wählen oder tippen …", entfernen: "Entfernen", meldungen: "Benachrichtigungen & Protokoll",
+    kein_push: "Kein Push-Dienst gewählt – Zahnrad der Rollladensteuerung → Allgemein → Push-Dienst.", push_ueber: "Push über",
+    protokoll: "Protokoll (14 Tage)", protokoll_anzeigen: "Protokoll anzeigen", protokoll_speichern: "Protokoll speichern",
+    alle_rolllaeden: "Alle Rollläden", alle_arten: "Alle Arten", suchen: "Suchen …", zeit: "Zeit", rollladen: "Rollladen",
+    art: "Art", meldung: "Meldung", eintraege: "Einträge",
   },
   en: {
     speichern: "Save", abbrechen: "Cancel", schliessen: "Close", status: "Status",
@@ -40,7 +44,11 @@ const TEXTE = {
     zaehler_gestern: "Shading moves yesterday", ja: "yes", nein: "no", unbekannt: "–",
     offen: "open", zu: "closed", gekippt: "tilted", laedt: "Loading …", naechstes_oeffnen: "Next opening",
     naechstes_schliessen: "Next closing", keine_konfig: "Shutter control is not set up.",
-    nur_admin: "Only administrators can change settings.", aus: "off", auswaehlen: "Pick or type an entity …", entfernen: "Remove",
+    nur_admin: "Only administrators can change settings.", aus: "off", auswaehlen: "Pick or type an entity …", entfernen: "Remove", meldungen: "Notifications & log",
+    kein_push: "No push service selected – gear of the shutter control → General → push service.", push_ueber: "Push via",
+    protokoll: "Log (14 days)", protokoll_anzeigen: "Show log", protokoll_speichern: "Save log",
+    alle_rolllaeden: "All shutters", alle_arten: "All types", suchen: "Search …", zeit: "Time", rollladen: "Shutter",
+    art: "Type", meldung: "Message", eintraege: "entries",
   },
 };
 const tx = (hass, key) => (TEXTE[(hass?.language || "en").split("-")[0]] || TEXTE.en)[key] || key;
@@ -268,6 +276,11 @@ const SCHALTER_SYMBOL = { morgens: "mdi:weather-sunset-up", abends: "mdi:weather
 
 class ZentraleKarte extends HTMLElement {
   setConfig(config) { this._config = config || {}; }
+  connectedCallback() {
+    this._neu = (ev) => { this._konfig = ev.detail; if (this.shadowRoot) { this._schalterBauen(); this._zeichnen(); } };
+    window.addEventListener("rollladensteuerung-konfig", this._neu);
+  }
+  disconnectedCallback() { window.removeEventListener("rollladensteuerung-konfig", this._neu); }
   static getStubConfig() { return {}; }
   getCardSize() { return 5; }
   getGridOptions() { return { columns: 12, min_columns: 6, rows: "auto" }; }
@@ -621,11 +634,222 @@ class EinstellDialog extends HTMLElement {
         await this.hass.callWS({ type: "rollladensteuerung/global/speichern", daten: this._daten });
       }
       setTimeout(() => konfigNeu(this.hass).catch(() => {}), 1500);
+      setTimeout(() => konfigNeu(this.hass).catch(() => {}), 5000);
       this.remove();
     } catch (e) {
       meldung.textContent = `${tx(this.hass, "fehler")}: ${e?.message || e}`;
       knopf.disabled = false;
     }
+  }
+}
+
+
+/* ---------------------------------------------------------------- Benachrichtigungen & Protokoll */
+const PUSH_SYMBOL = { push_oeffnen: "mdi:weather-sunset-up", push_schliessen: "mdi:weather-sunset-down",
+  push_warnungen: "mdi:alert-outline", push_lueften: "mdi:window-open-variant", push_abschatten: "mdi:sun-angle",
+  push_funktionen: "mdi:toggle-switch-outline", push_manuell: "mdi:hand-back-right-outline" };
+const ARTEN = {
+  de: { oeffnen: "Öffnen", schliessen: "Schließen", lueften: "Lüften", abschatten: "Abschatten", warnung: "Warnung",
+        manuell: "Von Hand", fahrt: "Fahrt", info: "Info", funktion: "Funktion" },
+  en: { oeffnen: "Open", schliessen: "Close", lueften: "Ventilate", abschatten: "Shade", warnung: "Warning",
+        manuell: "Manual", fahrt: "Move", info: "Info", funktion: "Function" },
+};
+const artText = (hass, art) => ((ARTEN[(hass?.language || "en").split("-")[0]] || ARTEN.en)[art] || art);
+
+async function protokollLaden(hass, tage = 14) {
+  return (await hass.callWS({ type: "rollladensteuerung/protokoll", tage })).eintraege || [];
+}
+
+async function protokollSpeichern(hass, eintraege) {
+  const kopf = "Zeit;Rollladen;Art;Meldung";
+  const zeilen = eintraege.map((e) => [e.zeit, e.rollladen, artText(hass, e.art), e.text]
+    .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";"));
+  const inhalt = "﻿" + [kopf, ...zeilen].join("\r\n");
+  const name = `rollladensteuerung-protokoll-${new Date().toISOString().slice(0, 10)}.csv`;
+  const datei = new File([inhalt], name, { type: "text/csv" });
+  // Auf Handy/Tablet (App) über „Teilen“ speichern, sonst als Download
+  if (navigator.canShare && navigator.canShare({ files: [datei] })) {
+    try { await navigator.share({ files: [datei], title: name }); return; } catch (e) { if (e?.name === "AbortError") return; }
+  }
+  const url = URL.createObjectURL(datei);
+  const a = document.createElement("a");
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+class MeldungenKarte extends HTMLElement {
+  setConfig(config) { this._config = config || {}; }
+  connectedCallback() {
+    this._neu = (ev) => { this._konfig = ev.detail; if (this.shadowRoot) { this._schalterBauen(); this._zeichnen(); } };
+    window.addEventListener("rollladensteuerung-konfig", this._neu);
+  }
+  disconnectedCallback() { window.removeEventListener("rollladensteuerung-konfig", this._neu); }
+  static getStubConfig() { return {}; }
+  getCardSize() { return 4; }
+  getGridOptions() { return { columns: 12, min_columns: 6, rows: "auto" }; }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (!this._aufgebaut) this._aufbauen();
+    if (!this._konfig && !this._laedt) {
+      this._laedt = true;
+      ladeKonfig(hass).then((k) => { this._konfig = k; this._schalterBauen(); this._zeichnen(); }).catch(() => {});
+    }
+    this._zeichnen();
+  }
+
+  _aufbauen() {
+    this._aufgebaut = true;
+    const root = this.attachShadow({ mode: "open" });
+    root.innerHTML = `
+      <style>${GEMEINSAM_CSS}
+        .schalter { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+        .schalter button { display: flex; align-items: center; gap: 8px; padding: 0 10px; height: 44px; border: none;
+          border-radius: 12px; cursor: pointer; text-align: left; font: inherit; font-size: 13px;
+          background: rgba(var(--rgb-primary-text-color, 0,0,0), 0.05); color: var(--primary-text-color); }
+        .schalter button.an { background: rgba(var(--rgb-primary-color, 3,169,244), 0.18); }
+        .schalter button.an ha-icon { color: var(--primary-color); }
+        .hinweis { font-size: 13px; color: var(--warning-color, #e65100); }
+        .alle button { min-width: 150px; }
+      </style>
+      <ha-card>
+        <div class="kopf">
+          <div class="symbol" style="--rgb-farbe: var(--rgb-primary-color, 3,169,244)"><ha-icon icon="mdi:bell-outline"></ha-icon></div>
+          <div class="text"><div class="name">${tx(this._hass, "meldungen")}</div>
+            <div class="zustand dienst"></div></div>
+        </div>
+        <div class="hinweis" hidden>${tx(this._hass, "kein_push")}</div>
+        <div class="schalter"></div>
+        <div class="tasten alle">
+          <button class="anzeigen"><ha-icon icon="mdi:text-box-search-outline"></ha-icon>&nbsp;${tx(this._hass, "protokoll_anzeigen")}</button>
+          <button class="speichern"><ha-icon icon="mdi:download"></ha-icon>&nbsp;${tx(this._hass, "protokoll_speichern")}</button>
+        </div>
+      </ha-card>`;
+    root.querySelector(".anzeigen").addEventListener("click", () => {
+      const d = document.createElement("rollladensteuerung-protokoll");
+      d.hass = this._hass;
+      document.body.appendChild(d);
+    });
+    root.querySelector(".speichern").addEventListener("click", async () => {
+      try { await protokollSpeichern(this._hass, await protokollLaden(this._hass)); } catch (e) { alert(e?.message || e); }
+    });
+  }
+
+  _schalterBauen() {
+    const feld = this.shadowRoot.querySelector(".schalter");
+    feld.innerHTML = "";
+    for (const [name, eid] of Object.entries(this._konfig.push || {})) {
+      if (!eid) continue;
+      const b = document.createElement("button");
+      b.dataset.entity = eid;
+      b.innerHTML = `<ha-icon icon="${PUSH_SYMBOL[name] || "mdi:bell-outline"}"></ha-icon><span></span>`;
+      b.addEventListener("click", () => this._hass.callService("switch", "toggle", { entity_id: eid }));
+      feld.appendChild(b);
+    }
+  }
+
+  _zeichnen() {
+    if (!this._konfig || !this.shadowRoot) return;
+    const r = this.shadowRoot;
+    r.querySelectorAll(".schalter button").forEach((b) => {
+      const st = this._hass.states[b.dataset.entity];
+      b.classList.toggle("an", st?.state === "on");
+      b.querySelector("span").textContent = (st?.attributes?.friendly_name || b.dataset.entity)
+        .replace(/^Rollladensteuerung\s*/i, "").replace(/^Push\s*/i, "");
+    });
+    const dienst = this._konfig.push_dienst;
+    r.querySelector(".dienst").textContent = dienst ? `${tx(this._hass, "push_ueber")} ${dienst}` : "";
+    r.querySelector(".hinweis").hidden = !!dienst;
+  }
+}
+
+class ProtokollDialog extends HTMLElement {
+  connectedCallback() {
+    const h = this.hass;
+    const root = this.attachShadow({ mode: "open" });
+    root.innerHTML = `
+      <style>
+        .hinter { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; display: flex;
+          align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; }
+        .fenster { background: var(--ha-card-background, var(--card-background-color, #fff)); color: var(--primary-text-color);
+          border-radius: 24px; width: 100%; max-width: 900px; max-height: 92vh; display: flex; flex-direction: column;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.3); overflow: hidden; }
+        .kopf { display: flex; align-items: center; padding: 16px 16px 8px 24px; gap: 8px; }
+        .kopf h2 { flex: 1; margin: 0; font-size: 22px; font-weight: 400; }
+        .kopf button, .fuss button { border: none; background: none; color: var(--primary-text-color); cursor: pointer; padding: 8px; border-radius: 20px; font: inherit; }
+        .filter { display: flex; gap: 8px; padding: 0 24px 8px; flex-wrap: wrap; }
+        .filter select, .filter input { font: inherit; font-size: 14px; padding: 8px; border-radius: 8px; border: 1px solid var(--divider-color);
+          background: var(--secondary-background-color, transparent); color: var(--primary-text-color); }
+        .filter input { flex: 1; min-width: 140px; }
+        .inhalt { overflow: auto; flex: 1; padding: 0 24px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { text-align: left; position: sticky; top: 0; background: var(--ha-card-background, var(--card-background-color, #fff));
+          padding: 6px 8px 6px 0; border-bottom: 1px solid var(--divider-color); color: var(--secondary-text-color); font-weight: 500; }
+        td { padding: 5px 8px 5px 0; border-bottom: 1px solid var(--divider-color); vertical-align: top; }
+        td.zeit { white-space: nowrap; color: var(--secondary-text-color); }
+        tr.warnung td { color: var(--error-color, #c62828); }
+        .fuss { display: flex; justify-content: space-between; align-items: center; padding: 12px 24px 20px; gap: 8px; font-size: 13px; color: var(--secondary-text-color); }
+        .fuss .haupt { background: var(--primary-color); color: var(--text-primary-color, #fff); padding: 10px 20px; font-weight: 500; }
+      </style>
+      <div class="hinter"><div class="fenster" role="dialog" aria-modal="true">
+        <div class="kopf"><h2>${tx(h, "protokoll")}</h2><button class="zu"><ha-icon icon="mdi:close"></ha-icon></button></div>
+        <div class="filter"><select class="rl"><option value="">${tx(h, "alle_rolllaeden")}</option></select>
+          <select class="art"><option value="">${tx(h, "alle_arten")}</option></select>
+          <input class="suche" placeholder="${tx(h, "suchen")}"></div>
+        <div class="inhalt">${tx(h, "laedt")}</div>
+        <div class="fuss"><span class="anzahl"></span><button class="haupt">${tx(h, "protokoll_speichern")}</button></div>
+      </div></div>`;
+    const weg = () => this.remove();
+    root.querySelector(".zu").addEventListener("click", weg);
+    root.querySelector(".hinter").addEventListener("click", (ev) => { if (ev.target === ev.currentTarget) weg(); });
+    this._taste = (ev) => { if (ev.key === "Escape") weg(); };
+    window.addEventListener("keydown", this._taste);
+    ["rl", "art"].forEach((k) => root.querySelector(`.${k}`).addEventListener("change", () => this._zeigen()));
+    root.querySelector(".suche").addEventListener("input", () => this._zeigen());
+    root.querySelector(".haupt").addEventListener("click", () => protokollSpeichern(h, this._gefiltert()));
+    protokollLaden(h).then((e) => {
+      this._eintraege = e;
+      const fuellen = (sel, werte, text) => werte.forEach((w) => {
+        const o = document.createElement("option"); o.value = w; o.textContent = text(w); sel.appendChild(o);
+      });
+      fuellen(root.querySelector(".rl"), [...new Set(e.map((x) => x.rollladen))].sort(), (w) => w);
+      fuellen(root.querySelector(".art"), [...new Set(e.map((x) => x.art))].sort(), (w) => artText(h, w));
+      this._zeigen();
+    }).catch((err) => { root.querySelector(".inhalt").textContent = `${tx(h, "fehler")}: ${err?.message || err}`; });
+  }
+
+  disconnectedCallback() { window.removeEventListener("keydown", this._taste); }
+
+  _gefiltert() {
+    const r = this.shadowRoot;
+    const rl = r.querySelector(".rl").value, art = r.querySelector(".art").value;
+    const suche = r.querySelector(".suche").value.toLowerCase();
+    return (this._eintraege || []).filter((e) => (!rl || e.rollladen === rl) && (!art || e.art === art)
+      && (!suche || `${e.rollladen} ${e.text}`.toLowerCase().includes(suche)));
+  }
+
+  _zeigen() {
+    const h = this.hass;
+    const liste = this._gefiltert();
+    const sprache = h?.locale?.language || h?.language || "de";
+    const tabelle = document.createElement("table");
+    tabelle.innerHTML = `<thead><tr><th>${tx(h, "zeit")}</th><th>${tx(h, "rollladen")}</th><th>${tx(h, "art")}</th><th>${tx(h, "meldung")}</th></tr></thead>`;
+    const body = document.createElement("tbody");
+    for (const e of liste.slice(0, 2000)) {
+      const tr = body.insertRow();
+      if (e.art === "warnung") tr.className = "warnung";
+      const d = new Date(e.zeit);
+      const z = tr.insertCell(); z.className = "zeit";
+      z.textContent = isNaN(d) ? e.zeit : d.toLocaleString(sprache, { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+      tr.insertCell().textContent = e.rollladen;
+      tr.insertCell().textContent = artText(h, e.art);
+      tr.insertCell().textContent = e.text;
+    }
+    tabelle.appendChild(body);
+    const inhalt = this.shadowRoot.querySelector(".inhalt");
+    inhalt.innerHTML = "";
+    inhalt.appendChild(tabelle);
+    this.shadowRoot.querySelector(".anzahl").textContent = `${liste.length} ${tx(h, "eintraege")}`;
   }
 }
 
@@ -661,7 +885,10 @@ async function ansichtBauen(config, hass) {
     oben.push({ type: "history-graph", hours_to_show: 24, grid_options: { columns: "full" },
       entities: k.helligkeit.map((s) => ({ entity: s.entity, name: s.name })) });
   }
-  const sections = [{ type: "grid", cards: oben }];
+  // Automatik und Benachrichtigungen in EINER Spalte – die Stockwerke folgen daneben
+  const sections = [{ type: "grid", cards: [...oben,
+    { type: "heading", heading: tx(hass, "meldungen"), icon: "mdi:bell-outline" },
+    { type: "custom:rollladensteuerung-meldungen-card", grid_options: { columns: "full" } }] }];
   for (const g of gruppieren(hass, k.rolllaeden)) {
     g.liste.sort((a, b) => a.name.localeCompare(b.name));
     sections.push({ type: "grid", cards: [
@@ -687,12 +914,15 @@ const definieren = (name, klasse) => { if (!customElements.get(name)) customElem
 definieren("rollladensteuerung-card", RollladenKarte);
 definieren("rollladensteuerung-zentrale-card", ZentraleKarte);
 definieren("rollladensteuerung-dialog", EinstellDialog);
+definieren("rollladensteuerung-meldungen-card", MeldungenKarte);
+definieren("rollladensteuerung-protokoll", ProtokollDialog);
 definieren("ll-strategy-view-rollladensteuerung", AnsichtVorlage);
 definieren("ll-strategy-dashboard-rollladensteuerung", DashboardVorlage);
 
 window.customCards = window.customCards || [];
 window.customCards.push(
   { type: "rollladensteuerung-card", name: "Rollladen (Rollladensteuerung)", description: "Rollladen mit Automatik-Status und Einstellungen", preview: false },
+  { type: "rollladensteuerung-meldungen-card", name: "Rollladensteuerung – Benachrichtigungen & Protokoll", description: "Push-Schalter und Protokoll der letzten 14 Tage", preview: false },
   { type: "rollladensteuerung-zentrale-card", name: "Rollladensteuerung – Zentrale", description: "Globale Schalter und Einstellungen", preview: false },
 );
 console.info(`%c ROLLLADENSTEUERUNG %c ${VERSION} `, "background:#926bc7;color:#fff", "background:#ddd;color:#000");

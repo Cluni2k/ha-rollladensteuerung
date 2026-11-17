@@ -22,6 +22,7 @@ GLOBAL = {
     "helligkeit_min": L("Abschattung erst prüfen ab Helligkeit", "Check shading only above brightness"),
     "wetter": L("Wettervorhersage (optional, für „heute erwartet“)", "Weather forecast (optional)"),
     "abstand_sekunden": L("Abstand zwischen Rollladenfahrten (schont den Funk-Duty-Cycle)", "Delay between shutter moves"),
+    "push_dienst": L("Push-Dienst (HA-App, Pushover …; ein Skript mit title/message lässt sich eintippen)", "Push service (HA app, Pushover …; a script with title/message can be typed in)"),
 }
 ABSCHNITTE = {
     "grundlagen": (L("Grundlagen", "Basics"), {
@@ -101,7 +102,11 @@ ENTITAETEN = {
     "switch": {"auto_morgens": L("Automatik morgens", "Automatic morning"), "auto_abends": L("Automatik abends", "Automatic evening"),
                "auto_abschattung": L("Abschattung", "Sun protection"), "auto_komfort": L("Komfort (Fenster)", "Comfort (windows)"),
                "auto_partymodus": L("Partymodus", "Party mode"), "auto_gast": L("Gast anwesend", "Guest present"),
-               "automatik": L("Automatik", "Automation")}}
+               "automatik": L("Automatik", "Automation"),
+               "auto_push_oeffnen": L("Push Öffnen", "Push opening"), "auto_push_schliessen": L("Push Schließen", "Push closing"),
+               "auto_push_warnungen": L("Push Warnhinweise", "Push warnings"), "auto_push_lueften": L("Push Lüften", "Push ventilation"),
+               "auto_push_abschatten": L("Push Abschatten", "Push shading"), "auto_push_funktionen": L("Push Funktionen", "Push functions"),
+               "auto_push_manuell": L("Push manuelle Fahrten", "Push manual moves")}}
 DIENSTE = {
     "neu_berechnen": (L("Zeiten neu berechnen", "Recalculate times"), L("Berechnet die nächsten Öffnen- und Schließzeiten aller Rollläden neu.", "Recalculates next open/close times.")),
     "abschattung_pruefen": (L("Abschattung jetzt prüfen", "Check sun protection now"), L("Prüft die Abschattung sofort für alle Rollläden.", "Runs the sun protection check now.")),

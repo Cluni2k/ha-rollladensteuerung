@@ -7,18 +7,22 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import SCHALTER
+from .const import PUSH, SCHALTER
 from .entity import Basis
 
 SYMBOLE = {"morgens": "mdi:weather-sunset-up", "abends": "mdi:weather-sunset-down",
            "abschattung": "mdi:sun-angle", "komfort": "mdi:window-open-variant",
-           "partymodus": "mdi:party-popper", "gast": "mdi:account-clock"}
+           "partymodus": "mdi:party-popper", "gast": "mdi:account-clock",
+           "push_oeffnen": "mdi:bell-ring-outline", "push_schliessen": "mdi:bell-ring-outline",
+           "push_warnungen": "mdi:bell-alert-outline", "push_lueften": "mdi:bell-outline",
+           "push_abschatten": "mdi:bell-outline", "push_funktionen": "mdi:bell-cog-outline",
+           "push_manuell": "mdi:bell-outline"}
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry,
                             async_add_entities: AddConfigEntryEntitiesCallback) -> None:
     st = entry.runtime_data
-    async_add_entities([GlobalSchalter(st, name) for name in SCHALTER])
+    async_add_entities([GlobalSchalter(st, name) for name in (*SCHALTER, *PUSH)])
     for sid in st.rolllaeden:
         async_add_entities([RollladenAktiv(st, sid)], config_subentry_id=sid)
 

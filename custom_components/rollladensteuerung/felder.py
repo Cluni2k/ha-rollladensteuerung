@@ -30,7 +30,7 @@ STANDARD.update({"fenster": [], "helligkeitssensor": "", "schlaf": "", "raumtemp
 
 TABS = ("grundlagen", "zeiten", "positionen", "fenster", "abschattung")
 OPTIONAL = {"fenster", "helligkeitssensor", "schlaf", "raumtemperatur", "min_temp_vorhersage",
-            CONF_ANWESENHEIT, CONF_TEMPERATUR, CONF_WERKTAG, "wetter"}
+            CONF_ANWESENHEIT, CONF_TEMPERATUR, CONF_WERKTAG, "wetter", "push_dienst"}
 GANZZAHL = {"offset_morgens", "offset_abends", "zufall_minuten", "offen_pos", "geschlossen_pos", "lueften_pos",
             "geoeffnet_pos", "pos_nach_komfort_oeffnen", "wartezeit", "sperrzeit_nach_manuell",
             "sperrzeit_vor_nacht", "abschattung_pos", "pos_nach_abschattung"}
@@ -118,7 +118,22 @@ def global_felder(hass: HomeAssistant) -> list[tuple[str, dict]]:
         (CONF_HELLIGKEIT_MIN, _zahl(0, 20000, 100, "lx")),
         ("wetter", {"entity": {"domain": "weather"}}),
         ("abstand_sekunden", _zahl(0, 60, 1, "s")),
+        ("push_dienst", {"select": {"options": push_dienste(hass), "mode": "dropdown", "custom_value": True}}),
     ]
+
+
+def push_dienste(hass: HomeAssistant) -> list[dict]:
+    """Benachrichtigungsdienste (HA-App, Pushover, Telegram …). Ein Skript mit title/message kann man eintippen."""
+    optionen = []
+    for name in sorted(hass.services.async_services().get("notify", {})):
+        if name in ("notify", "send_message", "persistent_notification"):
+            continue   # „notify“ = alle Dienste gleichzeitig, die anderen sind keine Push-Dienste
+        if name.startswith("mobile_app_"):
+            label = f"HA-App: {name.removeprefix('mobile_app_').replace('_', ' ')}"
+        else:
+            label = name.replace("_", " ").title()
+        optionen.append({"value": f"notify.{name}", "label": f"{label} (notify.{name})"})
+    return optionen
 
 
 GLOBAL_STANDARD = {CONF_SONNE: "sun.sun", CONF_ASTRO_MORGENS: "real", CONF_ASTRO_ABENDS: "real",
