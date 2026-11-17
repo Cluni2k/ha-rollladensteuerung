@@ -114,7 +114,7 @@ ENTITAETEN = {
                "auto_push_abschatten": L("Push Abschatten", "Push shading"), "auto_push_funktionen": L("Push Funktionen", "Push functions"),
                "auto_push_manuell": L("Push manuelle Fahrten", "Push manual moves"),
                "auto_urlaub": L("Urlaubsmodus", "Vacation mode"),
-               "auto_push_zusammenfassung": L("Tageszusammenfassung", "Daily summary")}}
+               "auto_push_zusammenfassung": L("Push Zusammenfassung", "Push summary")}}
 DIENSTE = {
     "neu_berechnen": (L("Zeiten neu berechnen", "Recalculate times"), L("Berechnet die nächsten Öffnen- und Schließzeiten aller Rollläden neu.", "Recalculates next open/close times.")),
     "abschattung_pruefen": (L("Abschattung jetzt prüfen", "Check sun protection now"), L("Prüft die Abschattung sofort für alle Rollläden.", "Runs the sun protection check now.")),

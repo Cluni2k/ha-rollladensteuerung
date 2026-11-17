@@ -5,7 +5,7 @@
  *  - Ansichts-/Dashboard-Vorlage (strategy) custom:rollladensteuerung – baut die Ansicht aus allen
  *    eingerichteten Rollläden (nach Stockwerk gruppiert), neue Rollläden erscheinen automatisch.
  */
-const VERSION = "0.5.0";
+const VERSION = "0.5.1";
 
 const TEXTE = {
   de: {
@@ -302,7 +302,9 @@ class ZentraleKarte extends HTMLElement {
     root.innerHTML = `
       <style>${GEMEINSAM_CSS}
         .schalter { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
-        .schalter button { display: flex; align-items: center; gap: 8px; padding: 0 10px; height: 44px; border: none;
+        .schalter button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+        .schalter button ha-icon { flex: none; }
+        .schalter button { display: flex; align-items: center; gap: 8px; padding: 0 10px; height: 44px; border: none; min-width: 0;
           border-radius: 12px; cursor: pointer; text-align: left; font: inherit; font-size: 13px;
           background: rgba(var(--rgb-primary-text-color, 0,0,0), 0.05); color: var(--primary-text-color); }
         .schalter button.an { background: rgba(var(--rgb-primary-color, 3,169,244), 0.18); }
@@ -314,7 +316,7 @@ class ZentraleKarte extends HTMLElement {
       <ha-card>
         <div class="kopf">
           <div class="symbol" style="--rgb-farbe: var(--rgb-primary-color, 3,169,244)"><ha-icon icon="mdi:window-shutter-auto"></ha-icon></div>
-          <div class="text"><div class="name">${this._config.title || tx(this._hass, "zentrale")}</div>
+          <div class="text"><div class="name titel">${this._config.title || tx(this._hass, "zentrale")}</div>
             <div class="zustand zeiten"></div></div>
           <button class="rund zahnrad" title="${tx(this._hass, "einstellungen")}"><ha-icon icon="mdi:cog"></ha-icon></button>
         </div>
@@ -356,6 +358,8 @@ class ZentraleKarte extends HTMLElement {
       b.querySelector("span").textContent = st?.attributes?.friendly_name?.replace(/^Rollladensteuerung\s*/i, "") || b.dataset.entity;
     });
     const z = this._konfig.zentrale;
+    const titel = this._config.title || tx(this._hass, "zentrale");
+    r.querySelector(".titel").textContent = this._konfig.version ? `${titel} (${this._konfig.version})` : titel;
     r.querySelector(".zeiten").innerHTML =
       `<span>${tx(this._hass, "oeffnet")} <b>${zeit(this._hass, this._hass.states[z.oeffnen]?.state)}</b></span>` +
       `<span>${tx(this._hass, "schliesst")} <b>${zeit(this._hass, this._hass.states[z.schliessen]?.state)}</b></span>`;
@@ -388,7 +392,8 @@ class EinstellDialog extends HTMLElement {
 
   connectedCallback() {
     const root = this.attachShadow({ mode: "open" });
-    const titel = this._art === "rollladen" ? this._rl.name : tx(this.hass, "zentrale");
+    const titel = this._art === "rollladen" ? this._rl.name
+      : `${tx(this.hass, "zentrale")}${this._k.version ? ` (${this._k.version})` : ""}`;
     root.innerHTML = `
       <style>
         .hinter { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; display: flex;
@@ -705,7 +710,9 @@ class MeldungenKarte extends HTMLElement {
     root.innerHTML = `
       <style>${GEMEINSAM_CSS}
         .schalter { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
-        .schalter button { display: flex; align-items: center; gap: 8px; padding: 0 10px; height: 44px; border: none;
+        .schalter button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+        .schalter button ha-icon { flex: none; }
+        .schalter button { display: flex; align-items: center; gap: 8px; padding: 0 10px; height: 44px; border: none; min-width: 0;
           border-radius: 12px; cursor: pointer; text-align: left; font: inherit; font-size: 13px;
           background: rgba(var(--rgb-primary-text-color, 0,0,0), 0.05); color: var(--primary-text-color); }
         .schalter button.an { background: rgba(var(--rgb-primary-color, 3,169,244), 0.18); }

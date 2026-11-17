@@ -14,6 +14,7 @@ except ImportError:
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
+from homeassistant.loader import async_get_integration
 
 from .config_flow import global_schema, rollladen_schema
 from .const import CONF_PUSH, DOMAIN, PUSH, SCHALTER, SUB_HELLIGKEIT, SUB_ROLLLADEN
@@ -102,6 +103,7 @@ async def ws_konfig(hass: HomeAssistant, connection: websocket_api.ActiveConnect
                        for sid, s in entry.subentries.items() if s.subentry_type == SUB_HELLIGKEIT],
         "zentrale": zentrale,
         "push": push,
+        "version": str((await async_get_integration(hass, DOMAIN)).version or ""),
         "push_dienst": {**entry.data, **entry.options}.get(CONF_PUSH) or "",
     })
 
