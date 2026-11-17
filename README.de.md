@@ -7,6 +7,10 @@ bekannten FHEM-Rollladensteuerung von Bernd Hermanns und Matthias Frintrop
 ([Thread im FHEM-Forum](https://forum.fhem.de/index.php/topic,73964.0.html)) als eigene Integration.
 Alles wird in der Oberfläche eingestellt, ein passendes Dashboard ist dabei.
 
+![Dashboard der Rollladensteuerung: Zentrale mit Schaltern und Alle-Buttons, Rollläden nach Stockwerk, Benachrichtigungen und Protokoll](https://raw.githubusercontent.com/Cluni2k/ha-rollladensteuerung/main/docs/dashboard.png)
+
+*Das Dashboard: links Automatik und Benachrichtigungen, rechts die Rollläden nach Stockwerk mit Status und nächster Öffnungs-/Schließzeit.*
+
 ## Funktionen
 
 **Öffnen und Schließen**

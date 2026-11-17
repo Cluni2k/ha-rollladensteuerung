@@ -8,7 +8,7 @@
  *    custom:rollladensteuerung (Rollläden eines Stockwerks), custom:rollladensteuerung-steuerung,
  *    custom:rollladensteuerung-meldungen
  */
-const VERSION = "0.6.1";
+const VERSION = "0.6.2";
 
 const TEXTE = {
   de: {

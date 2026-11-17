@@ -10,6 +10,10 @@ integration – configured entirely in the UI, with its own dashboard.
 > The user interface and entity names are available in **German and English** (follows your HA language).
 > Internal option keys are German (e.g. `offen_pos`, `abschattung`).
 
+![Dashboard of the shutter control: central card with switches and all buttons, shutters grouped by floor, notifications and log](https://raw.githubusercontent.com/Cluni2k/ha-rollladensteuerung/main/docs/dashboard.png)
+
+*The dashboard (German UI): automation and notifications on the left, shutters by floor with status and next opening/closing times.*
+
 ## Features
 
 **Opening and closing**
