@@ -22,6 +22,12 @@ GLOBAL = {
     "helligkeit_min": L("Abschattung erst prüfen ab Helligkeit", "Check shading only above brightness"),
     "wetter": L("Wettervorhersage (optional, für „heute erwartet“)", "Weather forecast (optional)"),
     "abstand_sekunden": L("Abstand zwischen Rollladenfahrten (schont den Funk-Duty-Cycle)", "Delay between shutter moves"),
+    "zusammenfassung_zeit": L("Uhrzeit der Tageszusammenfassung", "Time of the daily summary"),
+    "rauchmelder": L("Rauchmelder (optional): bei Alarm alle Rollläden öffnen", "Smoke detectors (optional): open all shutters on alarm"),
+    "hitzeschutz_temp": L("Hitzeschutz bei Abwesenheit ab (optional, außen oder Vorhersage)", "Heat protection when away from (optional)"),
+    "hitzeschutz_pos": L("Abschattungsposition beim Hitzeschutz", "Shading position for heat protection"),
+    "dunkel_lux": L("Abends schließen, sobald dunkler als (optional)", "Close in the evening once darker than (optional)"),
+    "urlaub_zufall": L("Urlaubsmodus: zusätzliche Zufallsminuten", "Vacation mode: extra random minutes"),
     "push_dienst": L("Push-Dienst (HA-App, Pushover …; ein Skript mit title/message lässt sich eintippen)", "Push service (HA app, Pushover …; a script with title/message can be typed in)"),
 }
 ABSCHNITTE = {
@@ -106,11 +112,14 @@ ENTITAETEN = {
                "auto_push_oeffnen": L("Push Öffnen", "Push opening"), "auto_push_schliessen": L("Push Schließen", "Push closing"),
                "auto_push_warnungen": L("Push Warnhinweise", "Push warnings"), "auto_push_lueften": L("Push Lüften", "Push ventilation"),
                "auto_push_abschatten": L("Push Abschatten", "Push shading"), "auto_push_funktionen": L("Push Funktionen", "Push functions"),
-               "auto_push_manuell": L("Push manuelle Fahrten", "Push manual moves")}}
+               "auto_push_manuell": L("Push manuelle Fahrten", "Push manual moves"),
+               "auto_urlaub": L("Urlaubsmodus", "Vacation mode"),
+               "auto_push_zusammenfassung": L("Tageszusammenfassung", "Daily summary")}}
 DIENSTE = {
     "neu_berechnen": (L("Zeiten neu berechnen", "Recalculate times"), L("Berechnet die nächsten Öffnen- und Schließzeiten aller Rollläden neu.", "Recalculates next open/close times.")),
     "abschattung_pruefen": (L("Abschattung jetzt prüfen", "Check sun protection now"), L("Prüft die Abschattung sofort für alle Rollläden.", "Runs the sun protection check now.")),
     "alle_oeffnen": (L("Alle öffnen", "Open all"), L("Fährt jeden Rollladen auf seine eingestellte Offen-Position.", "Moves every shutter to its configured open position.")),
+    "zusammenfassung_senden": (L("Tageszusammenfassung senden", "Send daily summary"), L("Schickt die Zusammenfassung des heutigen Tages sofort als Push.", "Sends today's summary as push now.")),
     "alle_abschatten": (L("Alle abschatten", "Shade all"), L("Fährt jeden Rollladen mit eingeschalteter Abschattung auf seine Abschattungsposition (nur nach unten).", "Moves every shutter with sun protection enabled down to its shading position.")),
     "alle_lueften": (L("Alle lüften", "Ventilate all"), L("Fährt jeden Rollladen auf seine eingestellte Lüften-Position.", "Moves every shutter to its ventilation position.")),
     "alle_schliessen": (L("Alle schließen", "Close all"), L("Fährt jeden Rollladen auf seine eingestellte Geschlossen-Position.", "Moves every shutter to its configured closed position.")),

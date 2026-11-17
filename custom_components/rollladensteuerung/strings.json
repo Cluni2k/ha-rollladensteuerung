@@ -17,6 +17,12 @@
           "helligkeit_min": "Check shading only above brightness",
           "wetter": "Weather forecast (optional)",
           "abstand_sekunden": "Delay between shutter moves",
+          "zusammenfassung_zeit": "Time of the daily summary",
+          "rauchmelder": "Smoke detectors (optional): open all shutters on alarm",
+          "hitzeschutz_temp": "Heat protection when away from (optional)",
+          "hitzeschutz_pos": "Shading position for heat protection",
+          "dunkel_lux": "Close in the evening once darker than (optional)",
+          "urlaub_zufall": "Vacation mode: extra random minutes",
           "push_dienst": "Push service (HA app, Pushover …; a script with title/message can be typed in)"
         }
       }
@@ -42,6 +48,12 @@
           "helligkeit_min": "Check shading only above brightness",
           "wetter": "Weather forecast (optional)",
           "abstand_sekunden": "Delay between shutter moves",
+          "zusammenfassung_zeit": "Time of the daily summary",
+          "rauchmelder": "Smoke detectors (optional): open all shutters on alarm",
+          "hitzeschutz_temp": "Heat protection when away from (optional)",
+          "hitzeschutz_pos": "Shading position for heat protection",
+          "dunkel_lux": "Close in the evening once darker than (optional)",
+          "urlaub_zufall": "Vacation mode: extra random minutes",
           "push_dienst": "Push service (HA app, Pushover …; a script with title/message can be typed in)"
         }
       }
@@ -363,6 +375,12 @@
       },
       "auto_push_manuell": {
         "name": "Push manual moves"
+      },
+      "auto_urlaub": {
+        "name": "Vacation mode"
+      },
+      "auto_push_zusammenfassung": {
+        "name": "Daily summary"
       }
     }
   },
@@ -378,6 +396,10 @@
     "alle_oeffnen": {
       "name": "Open all",
       "description": "Moves every shutter to its configured open position."
+    },
+    "zusammenfassung_senden": {
+      "name": "Send daily summary",
+      "description": "Sends today's summary as push now."
     },
     "alle_abschatten": {
       "name": "Shade all",

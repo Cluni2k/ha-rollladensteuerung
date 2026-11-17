@@ -285,3 +285,32 @@ def test_schliessen_bei_offenem_fenster_warnt():
     r = rl()
     r.schliessen(umg(), core.Lage(10, fenster=core.OFFEN))
     assert any(a == core.WARNUNG for a, _, _ in r.abholen())
+
+
+def test_rauchalarm_faehrt_nicht_runter():
+    r = rl()
+    assert r.schliessen(umg(alarm=True), core.Lage(100)) == []
+    assert any(a == core.WARNUNG for a, _, _ in r.abholen())
+    assert r.fahren(umg(alarm=True), core.Lage(0), 100, "Brandschutz: Rauchalarm")[0].position == 100
+
+
+def test_hitzeschutz_schattenposition():
+    r = rl(abschattung_pos=30)
+    assert r.schattenpos(umg(azimut=180, elevation=40)) == 30
+    assert r.schattenpos(umg(azimut=180, elevation=40, hitzeschutz=True, hitze_pos=10)) == 10
+
+
+def test_hitzeschutz_ignoriert_kuehlen_raum_und_fuehrt_nach():
+    r = rl(abschattung="ja", min_temp_aussen=0, min_temp_innen=23, abschattung_pos=30, sperrzeit_nach_manuell=0)
+    r.z.in_abschattung, r.z.abschattung_ziel, r.z.pos_vor_abschattung = True, 30, 100
+    u = umg(azimut=180, elevation=40, temperatur=30, hitzeschutz=True, hitze_pos=10)
+    f = r.abschattung(u, core.Lage(30, helligkeit=90000, raumtemperatur=21))
+    assert f[0].position == 10
+
+
+def test_urlaub_mehr_zufall():
+    r = rl(zufall_minuten=0, zeit_hoch_we="09:00:00")
+    auf = datetime(2026, 7, 1, 5, 0, tzinfo=TZ)
+    werte = {r.zeiten_berechnen(date(2026, 7, 1), False, auf, auf, TZ, random.Random(s), zufall_extra=30)[0]
+             for s in range(20)}
+    assert len(werte) > 1 and all(datetime(2026, 7, 1, 9, 0, tzinfo=TZ) <= w <= datetime(2026, 7, 1, 9, 30, tzinfo=TZ) for w in werte)

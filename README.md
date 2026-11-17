@@ -40,6 +40,13 @@ integration – configured entirely in the UI, with its own dashboard.
   only if the shutter was not moved in between.
 - If shading is due while the door is open, the shutter shades **after the door is closed**.
 
+**Extras (global settings, all optional)**
+- **Fire protection:** on a smoke alarm all shutters open (escape route) and nothing moves down automatically until the alarm is over.
+- **Heat protection when away:** above X °C (measured or forecast) and nobody at home, shading goes to a darker position.
+- **Close at dusk:** in the evening the shutters close as soon as it is darker than X lux – not before *close earliest*.
+- **Vacation mode** (switch on the central card): weekend/holiday times every day and extra random minutes.
+- **Daily summary** (switch on the notifications card): one push in the evening with what happened today.
+
 **Notifications and log**
 - Choose a **push service** (HA companion app, Pushover, … – any `notify` service; a script with `title`/`message` can be typed in).
 - Switches for what you want as push: **opening started** and **closing started** (one message for all shutters),
@@ -104,6 +111,8 @@ views:
       title: Shutters
 ```
 
+By default the floors come first and the central cards after them; `steuerung: vorne` puts them first.
+
 **Single cards:**
 ```yaml
 type: custom:rollladensteuerung-card
@@ -155,6 +164,7 @@ frost temperature, minimum brightness for the shading check, weather entity, del
 | `rollladensteuerung.alle_lueften` | every shutter to its ventilation position (staggered) |
 | `rollladensteuerung.alle_abschatten` | every shutter with sun protection enabled down to its shading position (staggered) |
 | `rollladensteuerung.alle_schliessen` | every shutter to its closed position (staggered) |
+| `rollladensteuerung.zusammenfassung_senden` | send today's summary as push now |
 | `rollladensteuerung.neu_berechnen` | recalculate the next opening/closing times |
 | `rollladensteuerung.abschattung_pruefen` | run the sun protection check now |
 

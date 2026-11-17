@@ -16,7 +16,8 @@ SYMBOLE = {"morgens": "mdi:weather-sunset-up", "abends": "mdi:weather-sunset-dow
            "push_oeffnen": "mdi:bell-ring-outline", "push_schliessen": "mdi:bell-ring-outline",
            "push_warnungen": "mdi:bell-alert-outline", "push_lueften": "mdi:bell-outline",
            "push_abschatten": "mdi:bell-outline", "push_funktionen": "mdi:bell-cog-outline",
-           "push_manuell": "mdi:bell-outline"}
+           "push_manuell": "mdi:bell-outline", "urlaub": "mdi:palm-tree",
+           "push_zusammenfassung": "mdi:text-box-outline"}
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry,

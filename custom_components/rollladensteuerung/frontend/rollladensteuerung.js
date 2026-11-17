@@ -5,7 +5,7 @@
  *  - Ansichts-/Dashboard-Vorlage (strategy) custom:rollladensteuerung – baut die Ansicht aus allen
  *    eingerichteten Rollläden (nach Stockwerk gruppiert), neue Rollläden erscheinen automatisch.
  */
-const VERSION = "0.4.0";
+const VERSION = "0.5.0";
 
 const TEXTE = {
   de: {
@@ -272,7 +272,7 @@ class RollladenKarte extends HTMLElement {
 
 /* ---------------------------------------------------------------- Zentrale-Karte */
 const SCHALTER_SYMBOL = { morgens: "mdi:weather-sunset-up", abends: "mdi:weather-sunset-down", abschattung: "mdi:sun-angle",
-  komfort: "mdi:window-open-variant", partymodus: "mdi:party-popper", gast: "mdi:account-clock" };
+  komfort: "mdi:window-open-variant", partymodus: "mdi:party-popper", gast: "mdi:account-clock", urlaub: "mdi:palm-tree" };
 
 class ZentraleKarte extends HTMLElement {
   setConfig(config) { this._config = config || {}; }
@@ -647,7 +647,8 @@ class EinstellDialog extends HTMLElement {
 /* ---------------------------------------------------------------- Benachrichtigungen & Protokoll */
 const PUSH_SYMBOL = { push_oeffnen: "mdi:weather-sunset-up", push_schliessen: "mdi:weather-sunset-down",
   push_warnungen: "mdi:alert-outline", push_lueften: "mdi:window-open-variant", push_abschatten: "mdi:sun-angle",
-  push_funktionen: "mdi:toggle-switch-outline", push_manuell: "mdi:hand-back-right-outline" };
+  push_funktionen: "mdi:toggle-switch-outline", push_manuell: "mdi:hand-back-right-outline",
+  push_zusammenfassung: "mdi:text-box-outline" };
 const ARTEN = {
   de: { oeffnen: "Öffnen", schliessen: "Schließen", lueften: "Lüften", abschatten: "Abschatten", warnung: "Warnung",
         manuell: "Von Hand", fahrt: "Fahrt", info: "Info", funktion: "Funktion" },
@@ -885,10 +886,12 @@ async function ansichtBauen(config, hass) {
     oben.push({ type: "history-graph", hours_to_show: 24, grid_options: { columns: "full" },
       entities: k.helligkeit.map((s) => ({ entity: s.entity, name: s.name })) });
   }
-  // Automatik und Benachrichtigungen in EINER Spalte – die Stockwerke folgen daneben
-  const sections = [{ type: "grid", cards: [...oben,
+  // Automatik und Benachrichtigungen in EINER Spalte; standardmäßig hinter den Stockwerken
+  // (Option steuerung: vorne stellt sie an den Anfang)
+  const steuerung = { type: "grid", cards: [...oben,
     { type: "heading", heading: tx(hass, "meldungen"), icon: "mdi:bell-outline" },
-    { type: "custom:rollladensteuerung-meldungen-card", grid_options: { columns: "full" } }] }];
+    { type: "custom:rollladensteuerung-meldungen-card", grid_options: { columns: "full" } }] };
+  const sections = [];
   for (const g of gruppieren(hass, k.rolllaeden)) {
     g.liste.sort((a, b) => a.name.localeCompare(b.name));
     sections.push({ type: "grid", cards: [
@@ -896,6 +899,7 @@ async function ansichtBauen(config, hass) {
       ...g.liste.map((r) => ({ type: "custom:rollladensteuerung-card", entity: r.cover })),
     ] });
   }
+  if (config.steuerung === "vorne") sections.unshift(steuerung); else sections.push(steuerung);
   return { title: config.title || tx(hass, "rolllaeden"), path: config.path, icon: config.icon,
     type: "sections", max_columns: config.max_columns || 4, sections };
 }

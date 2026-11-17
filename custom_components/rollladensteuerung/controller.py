@@ -41,7 +41,13 @@ from .const import (
     CONF_HELLIGKEITSSENSOR,
     CONF_HORIZONT_ABENDS,
     CONF_HORIZONT_MORGENS,
+    CONF_DUNKEL,
+    CONF_HITZE_POS,
+    CONF_HITZE_TEMP,
     CONF_PUSH,
+    CONF_RAUCH,
+    CONF_URLAUB_ZUFALL,
+    CONF_ZUSAMMENFASSUNG,
     CONF_RAUMTEMPERATUR,
     CONF_SCHLAF,
     CONF_SONNE,
@@ -58,7 +64,7 @@ from .const import (
     SUB_ROLLLADEN,
 )
 from .protokoll import Protokoll
-from .core import ABSCHATTEN, LUEFTEN, MANUELL, OEFFNEN, SCHLIESSEN, WARNUNG, GEKIPPT, OFFEN, ZU, Einstellungen, Fahrt, Lage, Rollladen, Umgebung, Zustand
+from .core import ABSCHATTEN, LUEFTEN, MANUELL, OEFFNEN, SCHLIESSEN, WARNUNG, GEKIPPT, OFFEN, ZU, Einstellungen, Fahrt, Lage, Rollladen, Umgebung, Zustand, als_zeit
 
 _LOGGER = logging.getLogger(__name__)
 _REIHENFOLGE = {ZU: 0, GEKIPPT: 1, OFFEN: 2}
@@ -67,7 +73,8 @@ SCHALTER_NAMEN = {"morgens": "Automatik morgens", "abends": "Automatik abends", 
                   "push_oeffnen": "Push Öffnen", "push_schliessen": "Push Schließen",
                   "push_warnungen": "Push Warnhinweise", "push_lueften": "Push Lüften",
                   "push_abschatten": "Push Abschatten", "push_funktionen": "Push Funktionen",
-                  "push_manuell": "Push manuelle Fahrten"}
+                  "push_manuell": "Push manuelle Fahrten", "urlaub": "Urlaubsmodus",
+                  "push_zusammenfassung": "Tageszusammenfassung"}
 _DREHGRIFF = {"closed": ZU, "geschlossen": ZU, "tilted": GEKIPPT, "gekippt": GEKIPPT,
               "open": OFFEN, "offen": OFFEN, "geoeffnet": OFFEN, "geöffnet": OFFEN}
 
@@ -112,6 +119,10 @@ class Steuerung:
         self._tagesmeldung: dict[str, str] = {}   # Sammelmeldung Öffnen/Schließen nur einmal am Tag
         self._ausfall: dict[str, Any] = {}        # Entität → Abmelde-Funktion des 15-Minuten-Timers
         self._gewarnt: dict[str, str] = {}        # Entität → Datum der letzten Ausfall-Warnung
+        self._ruhe: dict[str, Any] = {}           # Rollladen → Timer: erst auswerten, wenn er wirklich steht
+        self._zuletzt: dict[str, tuple] = {}      # Rollladen → (Position, Zeit) der letzten ausgewerteten Meldung
+        self._dunkel_seit: dict[str, datetime] = {}
+        self.rauchmelder: list[str] = list(self.cfg.get(CONF_RAUCH) or [])
 
         hell = {sid: s.data.get(CONF_ENTITY) for sid, s in entry.subentries.items()
                 if s.subentry_type == SUB_HELLIGKEIT}
@@ -157,6 +168,11 @@ class Steuerung:
             self.hass, self._nacht, hour=NACHT_RESET[0], minute=NACHT_RESET[1], second=NACHT_RESET[2]))
         self._abmelden.append(async_track_time_interval(
             self.hass, self._abschattung_takt, timedelta(minutes=ABSCHATTUNG_INTERVALL_MIN)))
+        if self.rauchmelder:
+            self._abmelden.append(async_track_state_change_event(self.hass, self.rauchmelder, self._rauch))
+        zeit = str(self.cfg.get(CONF_ZUSAMMENFASSUNG) or "21:00:00").split(":")
+        self._abmelden.append(async_track_time_change(
+            self.hass, self._zusammenfassung_takt, hour=int(zeit[0]), minute=int(zeit[1]), second=0))
         # Erreichbarkeit aller beteiligten Sensoren und Rollläden überwachen
         ueberwacht = self._ueberwachte()
         if ueberwacht:
@@ -174,10 +190,11 @@ class Steuerung:
     async def async_stop(self) -> None:
         for aufgabe in list(self._aufgaben):
             aufgabe.cancel()
-        for ab in self._ausfall.values():
+        for ab in [*self._ausfall.values(), *self._ruhe.values()]:
             if ab:
                 ab()
         self._ausfall.clear()
+        self._ruhe.clear()
         for ab in self._abmelden:
             ab()
         self._abmelden.clear()
@@ -222,7 +239,19 @@ class Steuerung:
             azimut=az, elevation=el, gast=self.schalter["gast"], party=self.schalter["partymodus"],
             auto_morgens=self.schalter["morgens"], auto_abends=self.schalter["abends"],
             auto_abschattung=self.schalter["abschattung"], auto_komfort=self.schalter["komfort"],
-            frost_temp=float(self.cfg.get(CONF_FROST_TEMP, 0)), vorhersage_max=self.vorhersage_max)
+            frost_temp=float(self.cfg.get(CONF_FROST_TEMP, 0)), vorhersage_max=self.vorhersage_max,
+            alarm=self.alarm(), hitzeschutz=self._hitzeschutz(anw), hitze_pos=int(self.cfg.get(CONF_HITZE_POS, 10)))
+
+    def alarm(self) -> bool:
+        return any((st := self.hass.states.get(e)) is not None and st.state == "on" for e in self.rauchmelder)
+
+    def _hitzeschutz(self, anwesend: bool | None) -> bool:
+        """Heiß (gemessen oder vorhergesagt) und niemand zu Hause → stärker abschatten."""
+        grenze = self.cfg.get(CONF_HITZE_TEMP)
+        if grenze in (None, "") or anwesend is not False:
+            return False
+        werte = [w for w in (_zahl(self.hass, self.cfg.get(CONF_TEMPERATUR)), self.vorhersage_max) if w is not None]
+        return bool(werte) and max(werte) >= float(grenze)
 
     def lage(self, sid: str) -> Lage:
         r = self.rolllaeden[sid]
@@ -430,6 +459,8 @@ class Steuerung:
 
     # ------------------------------------------------------------------ Zeitpläne
     async def _werktag(self, tag: date) -> bool:
+        if self.schalter.get("urlaub"):
+            return False   # Urlaubsmodus: jeden Tag die Wochenend-/Feiertagszeit
         eid = self.cfg.get(CONF_WERKTAG)
         heute = dt_util.now().date()
         if eid and tag == heute and (st := self.hass.states.get(eid)) and st.state in ("on", "off"):
@@ -462,6 +493,7 @@ class Steuerung:
         e = self.rolllaeden[sid].e
         werte = {k: self.cfg.get(k) for k in (CONF_ASTRO_MORGENS, CONF_ASTRO_ABENDS, CONF_HORIZONT_MORGENS,
                                               CONF_HORIZONT_ABENDS, CONF_WERKTAG, CONF_SONNE)}
+        werte["urlaub"] = (self.schalter.get("urlaub"), self.cfg.get(CONF_URLAUB_ZUFALL))
         werte.update({k: getattr(e, k) for k in ("hoch", "runter", "zeit_hoch_frueh", "zeit_hoch_spaet",
                                                  "zeit_hoch_we", "zeit_runter_frueh", "zeit_runter_spaet",
                                                  "offset_morgens", "offset_abends", "zufall_minuten")})
@@ -482,7 +514,8 @@ class Steuerung:
             for plus in (0, 1, 2):
                 tag = jetzt.date() + timedelta(days=plus)
                 hoch, runter = r.zeiten_berechnen(
-                    tag, await self._werktag(tag), self._astro(tag, True), self._astro(tag, False), tz)
+                    tag, await self._werktag(tag), self._astro(tag, True), self._astro(tag, False), tz,
+                    zufall_extra=int(self.cfg.get(CONF_URLAUB_ZUFALL, 30)) if self.schalter.get("urlaub") else 0)
                 t = hoch if art == "hoch" else runter
                 if t > jetzt + timedelta(minutes=1):
                     neu[art] = t
@@ -539,12 +572,34 @@ class Steuerung:
             pos_neu = 100 if neu.state == "open" else 0 if neu.state == "closed" else None
         if pos_neu == pos_alt and alt.state == neu.state:
             return
-        u = self.umgebung()
+        # Homematic meldet beim Losfahren erst kurz die Zielposition, dann „fährt“, am Ende wieder das Ziel.
+        # Deshalb erst auswerten, wenn der Rollladen ein paar Sekunden ruhig steht.
         for sid, r in self.rolllaeden.items():
             if r.e.cover == neu.entity_id:
-                r.positionsmeldung(u, pos_neu)
-                self._verarbeiten(sid)
-        self._melden()
+                if ab := self._ruhe.pop(sid, None):
+                    ab()
+                self._ruhe[sid] = async_call_later(self.hass, 4, self._ruhig_cb(sid))
+
+    def _ruhig_cb(self, sid: str):
+        @callback
+        def _ruhig(_now) -> None:
+            self._ruhe.pop(sid, None)
+            r = self.rolllaeden.get(sid)
+            if r is None:
+                return
+            st = self.hass.states.get(r.e.cover)
+            if st is None or st.state in ("opening", "closing", STATE_UNKNOWN, STATE_UNAVAILABLE):
+                return
+            pos = self.lage(sid).position
+            jetzt = dt_util.now()
+            alt = self._zuletzt.get(sid)
+            if alt and alt[0] == pos and (jetzt - alt[1]).total_seconds() < 120:
+                return   # dieselbe Position wurde gerade schon ausgewertet
+            self._zuletzt[sid] = (pos, jetzt)
+            r.positionsmeldung(self.umgebung(), pos)
+            self._verarbeiten(sid)
+            self._melden()
+        return _ruhig
 
     async def _fenster_geaendert(self, event: Event) -> None:
         eid = event.data["entity_id"]
@@ -566,7 +621,29 @@ class Steuerung:
 
     async def _abschattung_takt(self, _now: datetime) -> None:
         self._ziele_pruefen()
+        await self._dunkel_pruefen()
         await self.async_abschattung()
+
+    async def _dunkel_pruefen(self) -> None:
+        """Abends früher schließen, wenn es dunkel ist (nicht vor „Schließen frühestens“)."""
+        grenze = self.cfg.get(CONF_DUNKEL)
+        if grenze in (None, ""):
+            return
+        jetzt = dt_util.now()
+        for sid, r in self.rolllaeden.items():
+            hell = _zahl(self.hass, self.helligkeit.get(sid))
+            geplant = r.z.runter_zeit
+            frueh = datetime.combine(jetzt.date(), als_zeit(r.e.zeit_runter_frueh), jetzt.tzinfo)
+            if (hell is None or geplant is None or geplant.date() != jetzt.date() or jetzt < frueh
+                    or jetzt >= geplant or hell >= float(grenze)):
+                self._dunkel_seit.pop(sid, None)
+                continue
+            seit = self._dunkel_seit.setdefault(sid, jetzt)
+            if (jetzt - seit).total_seconds() < 300:
+                continue
+            self._dunkel_seit.pop(sid, None)
+            self.protokoll.eintragen(r.e.name, "info", f"Es ist dunkel ({hell:.0f} lx) – schließt vor der geplanten Zeit {geplant:%H:%M}")
+            await self._timer_cb(sid, "runter")(jetzt)
 
     async def async_abschattung(self) -> None:
         self._letzte_abschattung = dt_util.now()
@@ -586,6 +663,8 @@ class Steuerung:
             # Push-Schalter selbst nur protokollieren, alle anderen Funktionen auch melden
             self.funktion(f"{bezeichnung} {'eingeschaltet' if wert else 'ausgeschaltet'}",
                           push=not name.startswith("push_"))
+        if name == "urlaub" and alt != wert:
+            await self.async_alle_neu_planen()
         if name == "partymodus" and alt and not wert:
             u = self.umgebung()
             for sid, r in self.rolllaeden.items():
@@ -612,6 +691,60 @@ class Steuerung:
             if art == "abschatten" and lage.position is not None and lage.position < ziel:
                 continue
             await self._ausfuehren(sid, r.fahren(u, lage, ziel, grund))
+
+    # ------------------------------------------------------------------ Brandschutz
+    async def _rauch(self, event: Event) -> None:
+        neu, alt = event.data.get("new_state"), event.data.get("old_state")
+        if neu is None or neu.state != "on" or (alt is not None and alt.state == "on"):
+            if neu is not None and neu.state == "off" and alt is not None and alt.state == "on" and not self.alarm():
+                self.funktion("Rauchalarm beendet – Automatik läuft wieder normal", push=False)
+            return
+        text = f"🔥 Rauchalarm ({self._name(event.data['entity_id'])}) – alle Rollläden werden geöffnet."
+        self.protokoll.eintragen("Zentrale", WARNUNG, text)
+        self._push(text)   # immer, unabhängig von den Push-Schaltern
+        u = self.umgebung()
+        for sid, r in self.rolllaeden.items():
+            lage = self.lage(sid)
+            if lage.position is None or lage.position < 98:
+                await self._ausfuehren(sid, r.fahren(u, lage, 100, "Brandschutz: Rauchalarm"))
+
+    # ------------------------------------------------------------------ Tageszusammenfassung
+    async def _zusammenfassung_takt(self, _now: datetime) -> None:
+        if self.schalter.get("push_zusammenfassung"):
+            await self.async_zusammenfassung(senden=True)
+
+    async def async_zusammenfassung(self, senden: bool = False) -> str:
+        heute = dt_util.now().date().isoformat()
+        eintraege = [e for e in await self.protokoll.lesen(1) if e.get("zeit", "").startswith(heute)]
+
+        def zeiten(art: str) -> tuple[int, str]:
+            liste = [e for e in eintraege if e["art"] == art and "→" in e["text"]]
+            return len(liste), (min(e["zeit"][11:16] for e in liste) if liste else "")
+        teile = []
+        n, t = zeiten("oeffnen")
+        teile.append(f"Geöffnet: {n} ab {t} Uhr" if n else "Geöffnet: keine automatische Fahrt")
+        n, t = zeiten("schliessen")
+        teile.append(f"Geschlossen: {n} ab {t} Uhr" if n else "Geschlossen: noch nicht")
+        schatten = [e for e in eintraege if e["art"] == "abschatten" and e["text"].startswith("Abschatten")]
+        if schatten:
+            namen = sorted({e["rollladen"] for e in schatten})
+            teile.append(f"Abgeschattet: {len(schatten)}× ({', '.join(namen)})")
+        lueften = [e for e in eintraege if e["art"] == "lueften" and "→" in e["text"]]
+        if lueften:
+            teile.append(f"Lüften/Tür: {len(lueften)} Fahrten")
+        manuell = [e for e in eintraege if e["art"] == "manuell"]
+        if manuell:
+            teile.append(f"Von Hand: {len(manuell)} Fahrten")
+        warnungen = [e for e in eintraege if e["art"] == "warnung"]
+        if warnungen:
+            teile.append(f"Warnungen: {len(warnungen)} – zuletzt {warnungen[-1]['rollladen']}: {warnungen[-1]['text']}")
+        if self.schalter.get("urlaub"):
+            teile.append("Urlaubsmodus ist an")
+        text = "Rollläden heute – " + " · ".join(teile)
+        self.protokoll.eintragen("Zentrale", "info", "Tageszusammenfassung erstellt")
+        if senden:
+            self._push(text)
+        return text
 
     async def _schlaf_geaendert(self, event: Event) -> None:
         neu, alt = event.data.get("new_state"), event.data.get("old_state")

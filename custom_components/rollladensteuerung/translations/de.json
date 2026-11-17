@@ -17,6 +17,12 @@
           "helligkeit_min": "Abschattung erst prüfen ab Helligkeit",
           "wetter": "Wettervorhersage (optional, für „heute erwartet“)",
           "abstand_sekunden": "Abstand zwischen Rollladenfahrten (schont den Funk-Duty-Cycle)",
+          "zusammenfassung_zeit": "Uhrzeit der Tageszusammenfassung",
+          "rauchmelder": "Rauchmelder (optional): bei Alarm alle Rollläden öffnen",
+          "hitzeschutz_temp": "Hitzeschutz bei Abwesenheit ab (optional, außen oder Vorhersage)",
+          "hitzeschutz_pos": "Abschattungsposition beim Hitzeschutz",
+          "dunkel_lux": "Abends schließen, sobald dunkler als (optional)",
+          "urlaub_zufall": "Urlaubsmodus: zusätzliche Zufallsminuten",
           "push_dienst": "Push-Dienst (HA-App, Pushover …; ein Skript mit title/message lässt sich eintippen)"
         }
       }
@@ -42,6 +48,12 @@
           "helligkeit_min": "Abschattung erst prüfen ab Helligkeit",
           "wetter": "Wettervorhersage (optional, für „heute erwartet“)",
           "abstand_sekunden": "Abstand zwischen Rollladenfahrten (schont den Funk-Duty-Cycle)",
+          "zusammenfassung_zeit": "Uhrzeit der Tageszusammenfassung",
+          "rauchmelder": "Rauchmelder (optional): bei Alarm alle Rollläden öffnen",
+          "hitzeschutz_temp": "Hitzeschutz bei Abwesenheit ab (optional, außen oder Vorhersage)",
+          "hitzeschutz_pos": "Abschattungsposition beim Hitzeschutz",
+          "dunkel_lux": "Abends schließen, sobald dunkler als (optional)",
+          "urlaub_zufall": "Urlaubsmodus: zusätzliche Zufallsminuten",
           "push_dienst": "Push-Dienst (HA-App, Pushover …; ein Skript mit title/message lässt sich eintippen)"
         }
       }
@@ -363,6 +375,12 @@
       },
       "auto_push_manuell": {
         "name": "Push manuelle Fahrten"
+      },
+      "auto_urlaub": {
+        "name": "Urlaubsmodus"
+      },
+      "auto_push_zusammenfassung": {
+        "name": "Tageszusammenfassung"
       }
     }
   },
@@ -378,6 +396,10 @@
     "alle_oeffnen": {
       "name": "Alle öffnen",
       "description": "Fährt jeden Rollladen auf seine eingestellte Offen-Position."
+    },
+    "zusammenfassung_senden": {
+      "name": "Tageszusammenfassung senden",
+      "description": "Schickt die Zusammenfassung des heutigen Tages sofort als Push."
     },
     "alle_abschatten": {
       "name": "Alle abschatten",

@@ -167,6 +167,9 @@ class Umgebung:
     auto_komfort: bool = True
     frost_temp: float = 0
     vorhersage_max: float | None = None         # heutige Höchsttemperatur laut Wettervorhersage
+    alarm: bool = False                         # Rauchalarm: nichts mehr automatisch herunterfahren
+    hitzeschutz: bool = False                   # heiß und niemand zu Hause: stärker abschatten
+    hitze_pos: int = 10                         # Abschattungsposition beim Hitzeschutz
 
 
 @dataclass
@@ -240,6 +243,10 @@ class Rollladen:
 
     def _fahrt(self, u: Umgebung, lage: Lage, ziel: int, grund: str) -> list[Fahrt]:
         ziel = int(max(0, min(100, ziel)))
+        # Rauchalarm: Fluchtweg frei halten – nie automatisch herunterfahren
+        if u.alarm and lage.position is not None and ziel < lage.position:
+            self._melde(WARNUNG, f"{grund}: wegen Rauchalarm nicht heruntergefahren")
+            return []
         # Aussperrschutz: bei offener Tür nie automatisch weiter herunterfahren
         if (self.e.aussperrschutz and lage.fenster not in (None, ZU)
                 and lage.position is not None and ziel < lage.position):
@@ -253,6 +260,8 @@ class Rollladen:
     def schattenpos(self, u: Umgebung) -> int:
         """Abschattungsposition – fest oder dynamisch nach Sonnenstand (nie dunkler als die feste)."""
         fest = self.e.abschattung_pos
+        if u.hitzeschutz:
+            return min(fest, u.hitze_pos)
         if not self.e.abschattung_dynamisch or u.elevation is None or u.azimut is None or u.elevation <= 0:
             return fest
         abweichung = abs(winkel_abweichung(u.azimut, self.e.himmelsrichtung))
@@ -285,11 +294,11 @@ class Rollladen:
 
     # ------------------------------------------------------------------ Zeiten
     def zeiten_berechnen(self, tag: date, werktag: bool, aufgang: datetime | None,
-                         untergang: datetime | None, tz, rnd: random.Random | None = None
-                         ) -> tuple[datetime, datetime]:
-        """Öffnen-/Schließzeit für einen Tag (Auto_Rol_group_at)."""
+                         untergang: datetime | None, tz, rnd: random.Random | None = None,
+                         zufall_extra: int = 0) -> tuple[datetime, datetime]:
+        """Öffnen-/Schließzeit für einen Tag (Auto_Rol_group_at). zufall_extra: Urlaubsmodus."""
         rnd = rnd or random
-        z = max(0, self.e.zufall_minuten) * 60
+        z = max(0, self.e.zufall_minuten + zufall_extra) * 60
 
         def um(t: str) -> datetime:
             return datetime.combine(tag, als_zeit(t), tz)
@@ -549,7 +558,7 @@ class Rollladen:
         elif (self.e.min_temp_vorhersage is not None and u.vorhersage_max is not None
               and u.vorhersage_max < self.e.min_temp_vorhersage):
             kalt = f"heute nur {u.vorhersage_max:.0f} °C erwartet"
-        elif lage.raumtemperatur is not None and lage.raumtemperatur < (
+        elif not u.hitzeschutz and lage.raumtemperatur is not None and lage.raumtemperatur < (
                 self.e.min_temp_innen - (1 if self.z.in_abschattung else 0)):
             kalt = "Raum kühl – Sonne heizt mit"
         if kalt:
@@ -644,8 +653,9 @@ class Rollladen:
                 return []
             return self._abschattung_beenden(u, lage, "Abschattung Ende (Wolken)")
 
-        # dynamische Abschattung: der Sonne nachführen, solange niemand von Hand gefahren ist
-        if (self.e.abschattung_dynamisch and self.z.in_abschattung and not self.z.ende_vorgemerkt
+        # Zielposition hat sich geändert (dynamisch nach Sonnenstand, Hitzeschutz an/aus):
+        # nachführen, solange niemand von Hand gefahren ist
+        if (self.z.in_abschattung and not self.z.ende_vorgemerkt
                 and gleich(lage.position, self._ziel(), 5) and abs(ziel - self._ziel()) >= 10):
             self.z.abschattung_ziel = ziel
             self.z.letzte_aktion = u.jetzt

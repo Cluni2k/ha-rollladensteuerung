@@ -30,7 +30,8 @@ STANDARD.update({"fenster": [], "helligkeitssensor": "", "schlaf": "", "raumtemp
 
 TABS = ("grundlagen", "zeiten", "positionen", "fenster", "abschattung")
 OPTIONAL = {"fenster", "helligkeitssensor", "schlaf", "raumtemperatur", "min_temp_vorhersage",
-            CONF_ANWESENHEIT, CONF_TEMPERATUR, CONF_WERKTAG, "wetter", "push_dienst"}
+            CONF_ANWESENHEIT, CONF_TEMPERATUR, CONF_WERKTAG, "wetter", "push_dienst", "rauchmelder",
+            "hitzeschutz_temp", "dunkel_lux"}
 GANZZAHL = {"offset_morgens", "offset_abends", "zufall_minuten", "offen_pos", "geschlossen_pos", "lueften_pos",
             "geoeffnet_pos", "pos_nach_komfort_oeffnen", "wartezeit", "sperrzeit_nach_manuell",
             "sperrzeit_vor_nacht", "abschattung_pos", "pos_nach_abschattung"}
@@ -119,6 +120,13 @@ def global_felder(hass: HomeAssistant) -> list[tuple[str, dict]]:
         ("wetter", {"entity": {"domain": "weather"}}),
         ("abstand_sekunden", _zahl(0, 60, 1, "s")),
         ("push_dienst", {"select": {"options": push_dienste(hass), "mode": "dropdown", "custom_value": True}}),
+        ("zusammenfassung_zeit", {"time": {}}),
+        ("rauchmelder", {"entity": {"domain": "binary_sensor", "multiple": True,
+                                    "exclude_entities": versteckte(hass, ("binary_sensor",))}}),
+        ("hitzeschutz_temp", _zahl(15, 45, 0.5, "°C")),
+        ("hitzeschutz_pos", _zahl(0, 100, 5, "%", False)),
+        ("dunkel_lux", _zahl(0, 5000, 10, "lx")),
+        ("urlaub_zufall", _zahl(0, 120, 5, "min")),
     ]
 
 
@@ -138,7 +146,8 @@ def push_dienste(hass: HomeAssistant) -> list[dict]:
 
 GLOBAL_STANDARD = {CONF_SONNE: "sun.sun", CONF_ASTRO_MORGENS: "real", CONF_ASTRO_ABENDS: "real",
                    CONF_HORIZONT_MORGENS: 0, CONF_HORIZONT_ABENDS: 0, CONF_FROST_TEMP: 0,
-                   CONF_HELLIGKEIT_MIN: 500, "abstand_sekunden": 5}
+                   CONF_HELLIGKEIT_MIN: 500, "abstand_sekunden": 5, "zusammenfassung_zeit": "21:00:00",
+                   "hitzeschutz_pos": 10, "urlaub_zufall": 30}
 
 
 def helligkeit_felder(hass: HomeAssistant) -> list[tuple[str, dict]]:

@@ -37,6 +37,13 @@ Alles wird in der Oberfläche eingestellt, ein passendes Dashboard ist dabei.
   nur, wenn zwischendurch niemand gefahren ist.
 - Steht Abschattung an, während die Tür offen ist, wird **nach dem Schließen der Tür** abgeschattet.
 
+**Extras (Haupteinstellungen, alle optional)**
+- **Brandschutz:** Bei Rauchalarm öffnen alle Rollläden (Fluchtweg), und bis zum Ende des Alarms fährt nichts automatisch herunter.
+- **Hitzeschutz bei Abwesenheit:** Ab X °C (gemessen oder vorhergesagt) und wenn niemand zu Hause ist, wird dunkler abgeschattet.
+- **Schließen bei Dunkelheit:** Abends schließen die Rollläden, sobald es dunkler als X Lux ist – nicht vor *Schließen frühestens*.
+- **Urlaubsmodus** (Schalter in der Zentrale): jeden Tag Wochenend-/Feiertagszeiten und zusätzliche Zufallsminuten.
+- **Tageszusammenfassung** (Schalter bei den Benachrichtigungen): abends ein Push mit dem, was heute passiert ist.
+
 **Benachrichtigungen und Protokoll**
 - **Push-Dienst** wählbar (HA-App, Pushover, … – jeder `notify`-Dienst; ein Skript mit `title`/`message` lässt sich eintippen).
 - Schalter, was als Push kommen soll: **Öffnen gestartet** und **Schließen gestartet** (eine Nachricht für alle Rollläden),
@@ -103,6 +110,8 @@ views:
       title: Rollläden
 ```
 
+Standardmäßig kommen die Stockwerke zuerst und die Zentrale dahinter; `steuerung: vorne` stellt sie an den Anfang.
+
 **Einzelne Karten:**
 ```yaml
 type: custom:rollladensteuerung-card
@@ -154,6 +163,7 @@ Frostschutz-Temperatur, Mindesthelligkeit für die Abschattungsprüfung, Wetter,
 | `rollladensteuerung.alle_lueften` | jeder Rollladen auf seine Lüften-Position (gestaffelt) |
 | `rollladensteuerung.alle_abschatten` | jeder Rollladen mit eingeschalteter Abschattung auf seine Abschattungsposition (gestaffelt, nur nach unten) |
 | `rollladensteuerung.alle_schliessen` | jeder Rollladen auf seine Geschlossen-Position (gestaffelt) |
+| `rollladensteuerung.zusammenfassung_senden` | heutige Zusammenfassung sofort als Push senden |
 | `rollladensteuerung.neu_berechnen` | nächste Öffnen-/Schließzeiten neu berechnen |
 | `rollladensteuerung.abschattung_pruefen` | Abschattung sofort prüfen |
 
