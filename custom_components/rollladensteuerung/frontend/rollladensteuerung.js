@@ -9,7 +9,7 @@
  *    custom:rollladensteuerung (Rollläden eines Stockwerks), custom:rollladensteuerung-steuerung,
  *    custom:rollladensteuerung-meldungen
  */
-const VERSION = "0.7.2";
+const VERSION = "0.7.3";
 
 const TEXTE = {
   de: {
@@ -115,7 +115,11 @@ function zeit(hass, wert) {
   if (isNaN(d)) return "–";
   const sprache = hass?.locale?.language || hass?.language || "de";
   const heute = new Date();
-  const uhr = d.toLocaleTimeString(sprache, { hour: "2-digit", minute: "2-digit" });
+  // Zeitformat aus dem HA-Profil (12/24 h); bei 12 h ohne führende Null, damit die Zeile kurz bleibt
+  const tf = hass?.locale?.time_format;
+  const hour12 = tf === "12" ? true : tf === "24" ? false : undefined;
+  const zwoelf = new Intl.DateTimeFormat(sprache, { hour: "numeric", hour12 }).resolvedOptions().hour12;
+  const uhr = d.toLocaleTimeString(sprache, { hour: zwoelf ? "numeric" : "2-digit", minute: "2-digit", hour12 });
   if (d.toDateString() === heute.toDateString()) return uhr;
   return `${d.toLocaleDateString(sprache, { weekday: "short" })} ${uhr}`;
 }
@@ -163,6 +167,7 @@ const GEMEINSAM_CSS = `
   .auto { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--secondary-text-color); flex-wrap: wrap; }
   .auto ha-icon { --mdc-icon-size: 16px; }
   .auto .status { font-weight: 500; color: var(--primary-text-color); }
+  .auto .zeiten { display: inline-flex; gap: 8px; white-space: nowrap; }
 `;
 
 /* ---------------------------------------------------------------- Rollladen-Karte */
@@ -219,7 +224,7 @@ class RollladenKarte extends HTMLElement {
         </div>
         <div class="regler"><div class="fuellung"></div><div class="griff"></div></div>
         <div class="auto"><ha-icon icon="mdi:window-shutter-auto"></ha-icon><span class="status"></span>
-          <span class="hoch"></span><span class="runter"></span></div>
+          <span class="zeiten"><span class="hoch"></span><span class="runter"></span></span></div>
       </ha-card>`;
     root.querySelector(".symbol").addEventListener("click", () => mehrInfo(this, this._cover));
     root.querySelector(".text").addEventListener("click", () => mehrInfo(this, this._cover));
