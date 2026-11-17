@@ -12,7 +12,7 @@ integration – configured entirely in the UI, with its own dashboard.
 
 ![Dashboard of the shutter control: central card with switches and all buttons, shutters grouped by floor, notifications and log](https://raw.githubusercontent.com/Cluni2k/ha-rollladensteuerung/main/docs/dashboard.png)
 
-*The dashboard (German UI): automation and notifications on the left, shutters by floor with status and next opening/closing times.*
+*The dashboard (German UI): on the left the automation with brightness history and current sun position, plus notifications and log; on the right the shutters by floor with status and next opening/closing times.*
 
 ## Features
 

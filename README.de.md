@@ -9,7 +9,7 @@ Alles wird in der Oberfläche eingestellt, ein passendes Dashboard ist dabei.
 
 ![Dashboard der Rollladensteuerung: Zentrale mit Schaltern und Alle-Buttons, Rollläden nach Stockwerk, Benachrichtigungen und Protokoll](https://raw.githubusercontent.com/Cluni2k/ha-rollladensteuerung/main/docs/dashboard.png)
 
-*Das Dashboard: links Automatik und Benachrichtigungen, rechts die Rollläden nach Stockwerk mit Status und nächster Öffnungs-/Schließzeit.*
+*Das Dashboard: links die Automatik mit Helligkeitsverlauf und aktuellem Sonnenstand sowie Benachrichtigungen und Protokoll, rechts die Rollläden nach Stockwerk mit Status und nächster Öffnungs-/Schließzeit.*
 
 ## Funktionen
 
