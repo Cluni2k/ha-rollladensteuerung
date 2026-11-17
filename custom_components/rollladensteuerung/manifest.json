@@ -14,8 +14,8 @@
   "documentation": "https://github.com/Cluni2k/ha-rollladensteuerung",
   "integration_type": "service",
   "iot_class": "calculated",
+  "issue_tracker": "https://github.com/Cluni2k/ha-rollladensteuerung/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.5.1",
-  "issue_tracker": "https://github.com/Cluni2k/ha-rollladensteuerung/issues"
+  "version": "0.5.1"
 }
