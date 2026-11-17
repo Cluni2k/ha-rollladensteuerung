@@ -62,7 +62,8 @@ Alles wird in der Oberfläche eingestellt, ein passendes Dashboard ist dabei.
   `rollladensteuerung_fahrt` für eigene Benachrichtigungen.
 - **Dashboard inklusive:** Rollladen-Karten mit Zahnrad (Status und alle Einstellungen als Karteikarten),
   eine Zentrale-Karte für die globalen Schalter und Einstellungen und eine Dashboard-Vorlage, die die
-  Ansicht selbst aufbaut (nach Stockwerk gruppiert, neue Rollläden erscheinen automatisch).
+  Ansicht selbst aufbaut (nach Stockwerk gruppiert, neue Rollläden erscheinen automatisch), dazu automatische
+  Abschnitte für eigene, frei angeordnete Dashboards.
 
 ## Voraussetzungen
 
@@ -125,10 +126,32 @@ Das Zahnrad auf einer Rollladen-Karte öffnet einen Dialog mit den Karteikarten 
 Positionen, Fenster, Abschattung*. Das Zahnrad der Zentrale öffnet die Haupteinstellungen. Ändern dürfen
 nur Administratoren.
 
-**Selbst anordnen:** Ein Dashboard aus der Vorlage wird erzeugt und ist deshalb schreibgeschützt. Wer die Karten selbst
-anordnen möchte, wählt beim Bearbeiten *Kontrolle übernehmen* (⋮-Menü) oder baut die Ansicht aus den einzelnen Karten.
-Die Anordnung liegt dann im eigenen Dashboard und übersteht Updates der Integration; neue Rollläden fügt man dann von
-Hand hinzu (Karte *Rollladen (Rollladensteuerung)*).
+**Selbst anordnen (empfohlen, ab HA 2026.11): automatische Abschnitte.** In einer normalen Abschnitts-Ansicht
+*Abschnitt hinzufügen → Automatischer Abschnitt → Community* wählen. Es gibt drei Abschnitte:
+
+| Abschnitt | Inhalt | Einstellungen |
+|---|---|---|
+| *Rollläden (Rollladensteuerung)* | alle Rollläden eines Stockwerks, nach Namen sortiert | Stockwerk (oder *Alle Rollläden* / *ohne Stockwerk*), Überschrift |
+| *Rollladensteuerung – Automatik* | Zentrale mit Schaltern, Alle-Buttons und Zahnrad | Überschrift, Helligkeitsverlauf an/aus |
+| *Rollladensteuerung – Benachrichtigungen* | Push-Schalter und Protokoll | Überschrift |
+
+Die Abschnitte lassen sich frei verschieben und mit eigenen Karten mischen; die Anordnung liegt im eigenen Dashboard
+und übersteht Updates. Neue Rollläden erscheinen trotzdem automatisch im Abschnitt ihres Stockwerks (Stockwerk über den
+Bereich des Rollladens bzw. seines Geräts). Nur für ein ganz neues Stockwerk fügt man einmal einen Abschnitt hinzu.
+In YAML:
+```yaml
+type: sections
+sections:
+  - strategy:
+      type: custom:rollladensteuerung
+      stockwerk: erdgeschoss
+  - strategy:
+      type: custom:rollladensteuerung-steuerung
+  - strategy:
+      type: custom:rollladensteuerung-meldungen
+```
+
+Die Ansicht aus der Dashboard-Vorlage oben wird dagegen erzeugt und ist schreibgeschützt.
 
 ## Einstellungen je Rollladen
 

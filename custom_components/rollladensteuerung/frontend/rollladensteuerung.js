@@ -4,8 +4,11 @@
  *  - custom:rollladensteuerung-zentrale-card Globale Schalter, nächste Zeiten, Alle öffnen/schließen, Zahnrad
  *  - Ansichts-/Dashboard-Vorlage (strategy) custom:rollladensteuerung – baut die Ansicht aus allen
  *    eingerichteten Rollläden (nach Stockwerk gruppiert), neue Rollläden erscheinen automatisch.
+ *  - Abschnitts-Vorlagen (section strategies, ab HA 2026.11) für frei anordenbare Dashboards:
+ *    custom:rollladensteuerung (Rollläden eines Stockwerks), custom:rollladensteuerung-steuerung,
+ *    custom:rollladensteuerung-meldungen
  */
-const VERSION = "0.5.1";
+const VERSION = "0.6.0";
 
 const TEXTE = {
   de: {
@@ -28,6 +31,13 @@ const TEXTE = {
     protokoll: "Protokoll (14 Tage)", protokoll_anzeigen: "Protokoll anzeigen", protokoll_speichern: "Protokoll speichern",
     alle_rolllaeden: "Alle Rollläden", alle_arten: "Alle Arten", suchen: "Suchen …", zeit: "Zeit", rollladen: "Rollladen",
     art: "Art", meldung: "Meldung", eintraege: "Einträge",
+    f_stockwerk: "Stockwerk", f_titel: "Überschrift (leer = automatisch)", f_verlauf: "Helligkeitsverlauf anzeigen",
+    alle_stockwerke: "Alle Rollläden", ohne_stockwerk: "Rollläden ohne Stockwerk", stock_fehlt: "Dieses Stockwerk gibt es nicht mehr.",
+    keine_rolllaeden: "Keine Rollläden in diesem Stockwerk.",
+    v_rolllaeden: "Rollläden (Rollladensteuerung)", v_rolllaeden_text: "Alle Rollläden eines Stockwerks – neue erscheinen automatisch",
+    v_steuerung: "Rollladensteuerung – Automatik", v_steuerung_text: "Globale Schalter, Alle-Buttons, Einstellungen",
+    v_meldungen: "Rollladensteuerung – Benachrichtigungen", v_meldungen_text: "Push-Schalter und Protokoll",
+    v_dashboard_text: "Alle Rollläden nach Stockwerk mit Automatik und Benachrichtigungen",
   },
   en: {
     speichern: "Save", abbrechen: "Cancel", schliessen: "Close", status: "Status",
@@ -49,6 +59,13 @@ const TEXTE = {
     protokoll: "Log (14 days)", protokoll_anzeigen: "Show log", protokoll_speichern: "Save log",
     alle_rolllaeden: "All shutters", alle_arten: "All types", suchen: "Search …", zeit: "Time", rollladen: "Shutter",
     art: "Type", meldung: "Message", eintraege: "entries",
+    f_stockwerk: "Floor", f_titel: "Heading (empty = automatic)", f_verlauf: "Show brightness history",
+    alle_stockwerke: "All shutters", ohne_stockwerk: "Shutters without floor", stock_fehlt: "This floor no longer exists.",
+    keine_rolllaeden: "No shutters on this floor.",
+    v_rolllaeden: "Shutters (Rollladensteuerung)", v_rolllaeden_text: "All shutters of a floor – new ones appear automatically",
+    v_steuerung: "Shutter control – automation", v_steuerung_text: "Global switches, all buttons, settings",
+    v_meldungen: "Shutter control – notifications", v_meldungen_text: "Push switches and log",
+    v_dashboard_text: "All shutters by floor with automation and notifications",
   },
 };
 const tx = (hass, key) => (TEXTE[(hass?.language || "en").split("-")[0]] || TEXTE.en)[key] || key;
@@ -60,6 +77,12 @@ function ladeKonfig(hass, neu = false) {
     _konfig = hass.callWS({ type: "rollladensteuerung/konfig" }).catch((e) => { _konfig = null; throw e; });
   }
   return _konfig;
+}
+let _konfigZeit = 0;
+function frischeKonfig(hass) {
+  const neu = Date.now() - _konfigZeit > 3000;
+  if (neu) _konfigZeit = Date.now();
+  return ladeKonfig(hass, neu);
 }
 function konfigNeu(hass) {
   return ladeKonfig(hass, true).then((k) => {
@@ -880,41 +903,149 @@ function gruppieren(hass, rolllaeden) {
   return [...gruppen.values()].sort((a, b) => (a.level < 0) - (b.level < 0) || a.level - b.level);
 }
 
+function steuerungKarten(k, hass, config) {
+  const karten = [
+    { type: "heading", heading: config.titel || tx(hass, "automatik"), icon: "mdi:window-shutter-auto" },
+    { type: "custom:rollladensteuerung-zentrale-card", grid_options: { columns: "full" } },
+  ];
+  if (k.helligkeit.length && config.verlauf !== false) {
+    karten.push({ type: "history-graph", hours_to_show: 24, grid_options: { columns: "full" },
+      entities: k.helligkeit.map((s) => ({ entity: s.entity, name: s.name })) });
+  }
+  return karten;
+}
+function meldungenKarten(hass, config) {
+  return [
+    { type: "heading", heading: config.titel || tx(hass, "meldungen"), icon: "mdi:bell-outline" },
+    { type: "custom:rollladensteuerung-meldungen-card", grid_options: { columns: "full" } },
+  ];
+}
+function rollladenKarten(g, titel) {
+  const liste = [...g.liste].sort((a, b) => a.name.localeCompare(b.name));
+  return [
+    { type: "heading", heading: titel || g.name, icon: g.icon },
+    ...liste.map((r) => ({ type: "custom:rollladensteuerung-card", entity: r.cover })),
+  ];
+}
+
 async function ansichtBauen(config, hass) {
   let k;
   try { k = await ladeKonfig(hass, true); } catch (e) {
     return { title: config.title || "Rollläden", cards: [{ type: "markdown", content: tx(hass, "keine_konfig") }] };
   }
-  const oben = [
-    { type: "heading", heading: tx(hass, "automatik"), icon: "mdi:window-shutter-auto" },
-    { type: "custom:rollladensteuerung-zentrale-card", grid_options: { columns: "full" } },
-  ];
-  if (k.helligkeit.length && config.verlauf !== false) {
-    oben.push({ type: "history-graph", hours_to_show: 24, grid_options: { columns: "full" },
-      entities: k.helligkeit.map((s) => ({ entity: s.entity, name: s.name })) });
-  }
   // Automatik und Benachrichtigungen in EINER Spalte; standardmäßig hinter den Stockwerken
   // (Option steuerung: vorne stellt sie an den Anfang)
-  const steuerung = { type: "grid", cards: [...oben,
-    { type: "heading", heading: tx(hass, "meldungen"), icon: "mdi:bell-outline" },
-    { type: "custom:rollladensteuerung-meldungen-card", grid_options: { columns: "full" } }] };
-  const sections = [];
-  for (const g of gruppieren(hass, k.rolllaeden)) {
-    g.liste.sort((a, b) => a.name.localeCompare(b.name));
-    sections.push({ type: "grid", cards: [
-      { type: "heading", heading: g.name, icon: g.icon },
-      ...g.liste.map((r) => ({ type: "custom:rollladensteuerung-card", entity: r.cover })),
-    ] });
-  }
+  const steuerung = { type: "grid", cards: [...steuerungKarten(k, hass, { verlauf: config.verlauf }), ...meldungenKarten(hass, {})] };
+  const sections = gruppieren(hass, k.rolllaeden).map((g) => ({ type: "grid", cards: rollladenKarten(g) }));
   if (config.steuerung === "vorne") sections.unshift(steuerung); else sections.push(steuerung);
   return { title: config.title || tx(hass, "rolllaeden"), path: config.path, icon: config.icon,
     type: "sections", max_columns: config.max_columns || 4, sections };
+}
+
+/* ---------------------------------------------------------------- Abschnitts-Vorlagen (section strategies) */
+const hinweis = (text) => ({ type: "grid", cards: [{ type: "markdown", content: text }] });
+
+class AbschnittRolllaeden extends HTMLElement {
+  static getConfigElement() { return document.createElement("rollladensteuerung-abschnitt-editor"); }
+  static async getStubConfig(hass) {
+    try {
+      const k = await frischeKonfig(hass);
+      const g = gruppieren(hass, k.rolllaeden)[0];
+      const stock = g?.liste.length ? stockwerkVon(hass, g.liste[0]) : undefined;
+      return { type: "custom:rollladensteuerung", stockwerk: stock || "alle" };
+    } catch (e) { return { type: "custom:rollladensteuerung", stockwerk: "alle" }; }
+  }
+  static async generate(config, hass) {
+    let k;
+    try { k = await frischeKonfig(hass); } catch (e) { return hinweis(tx(hass, "keine_konfig")); }
+    const stock = config.stockwerk || "alle";
+    if (stock === "alle") {
+      return { type: "grid", cards: rollladenKarten({ name: tx(hass, "alle_stockwerke"), icon: "mdi:window-shutter",
+        liste: k.rolllaeden }, config.titel) };
+    }
+    if (stock !== "ohne" && !hass.floors?.[stock]) return hinweis(tx(hass, "stock_fehlt"));
+    const liste = k.rolllaeden.filter((r) => (stockwerkVon(hass, r) || "ohne") === stock);
+    const f = hass.floors?.[stock];
+    const g = { name: f?.name || tx(hass, "ohne_stockwerk"), icon: f?.icon || "mdi:window-shutter", liste };
+    const karten = rollladenKarten(g, config.titel);
+    if (!liste.length) karten.push({ type: "markdown", content: tx(hass, "keine_rolllaeden") });
+    return { type: "grid", cards: karten };
+  }
+}
+class AbschnittSteuerung extends HTMLElement {
+  static getConfigElement() { return document.createElement("rollladensteuerung-steuerung-editor"); }
+  static getStubConfig() { return { type: "custom:rollladensteuerung-steuerung" }; }
+  static async generate(config, hass) {
+    let k;
+    try { k = await frischeKonfig(hass); } catch (e) { return hinweis(tx(hass, "keine_konfig")); }
+    return { type: "grid", cards: steuerungKarten(k, hass, config) };
+  }
+}
+class AbschnittMeldungen extends HTMLElement {
+  static registryDependencies = [];
+  static getConfigElement() { return document.createElement("rollladensteuerung-meldungen-editor"); }
+  static getStubConfig() { return { type: "custom:rollladensteuerung-meldungen" }; }
+  static async generate(config, hass) { return { type: "grid", cards: meldungenKarten(hass, config) }; }
+}
+
+function stockwerkVon(hass, r) {
+  const ent = hass.entities?.[r.cover];
+  const geraet = ent?.device_id ? hass.devices?.[ent.device_id] : undefined;
+  const bereichId = ent?.area_id || geraet?.area_id;
+  return bereichId ? hass.areas?.[bereichId]?.floor_id || undefined : undefined;
+}
+
+// Einstellungen der Abschnitte (visueller Editor)
+class AbschnittEditor extends HTMLElement {
+  setConfig(config) { this._config = config; this._zeichnen(); }
+  set hass(hass) { this._hass = hass; this._zeichnen(); }
+  schema() { return [{ name: "titel", selector: { text: {} } }]; }
+  async _zeichnen() {
+    if (!this._hass || !this._config) return;
+    if (!this._form) {
+      this._form = true;
+      await haFormBereit();
+      const form = document.createElement("ha-form");
+      form.computeLabel = (f) => tx(this._hass, `f_${f.name}`);
+      form.addEventListener("value-changed", (ev) => {
+        const neu = { ...this._config, ...ev.detail.value };
+        for (const [s, w] of Object.entries(neu)) if (w === "" || w === undefined || w === null) delete neu[s];
+        this._config = neu;
+        this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: neu }, bubbles: true, composed: true }));
+      });
+      this.appendChild(form);
+      this._form = form;
+    }
+    if (this._form === true) return;
+    this._form.hass = this._hass;
+    this._form.schema = this.schema();
+    this._form.data = this._daten();
+  }
+  _daten() { return this._config; }
+}
+class RolllaedenEditor extends AbschnittEditor {
+  schema() {
+    const h = this._hass;
+    const stockwerke = Object.values(h.floors || {}).sort((a, b) => (a.level ?? 99) - (b.level ?? 99))
+      .map((f) => ({ value: f.floor_id, label: f.name }));
+    return [
+      { name: "stockwerk", selector: { select: { mode: "dropdown", options: [
+        { value: "alle", label: tx(h, "alle_stockwerke") }, ...stockwerke, { value: "ohne", label: tx(h, "ohne_stockwerk") }] } } },
+      ...super.schema(),
+    ];
+  }
+  _daten() { return { stockwerk: "alle", ...this._config }; }
+}
+class SteuerungEditor extends AbschnittEditor {
+  schema() { return [...super.schema(), { name: "verlauf", selector: { boolean: {} } }]; }
+  _daten() { return { verlauf: true, ...this._config }; }
 }
 
 class AnsichtVorlage extends HTMLElement {
   static async generate(config, hass) { return ansichtBauen(config, hass); }
 }
 class DashboardVorlage extends HTMLElement {
+  static getCreateSuggestions(hass) { return { title: tx(hass, "rolllaeden"), icon: "mdi:window-shutter-auto" }; }
   static async generate(config, hass) {
     return { title: config.title, views: [{ strategy: { ...config, type: "custom:rollladensteuerung" },
       title: config.title || tx(hass, "rolllaeden"), path: "rollladen", icon: "mdi:window-shutter-auto" }] };
@@ -929,6 +1060,30 @@ definieren("rollladensteuerung-meldungen-card", MeldungenKarte);
 definieren("rollladensteuerung-protokoll", ProtokollDialog);
 definieren("ll-strategy-view-rollladensteuerung", AnsichtVorlage);
 definieren("ll-strategy-dashboard-rollladensteuerung", DashboardVorlage);
+definieren("ll-strategy-section-rollladensteuerung", AbschnittRolllaeden);
+definieren("ll-strategy-section-rollladensteuerung-steuerung", AbschnittSteuerung);
+definieren("ll-strategy-section-rollladensteuerung-meldungen", AbschnittMeldungen);
+definieren("rollladensteuerung-abschnitt-editor", RolllaedenEditor);
+definieren("rollladensteuerung-steuerung-editor", SteuerungEditor);
+definieren("rollladensteuerung-meldungen-editor", AbschnittEditor);
+
+// im Dashboard-Editor auswählbar (Automatischer Abschnitt → Community / Neues Dashboard → Community)
+{
+  const sprache = (document.documentElement.lang || navigator.language || "en").split("-")[0];
+  const t = (key) => (TEXTE[sprache] || TEXTE.en)[key];
+  window.customStrategies = window.customStrategies || [];
+  const doku = "https://github.com/Cluni2k/ha-rollladensteuerung";
+  for (const [type, strategyType, name, description] of [
+    ["rollladensteuerung", "section", t("v_rolllaeden"), t("v_rolllaeden_text")],
+    ["rollladensteuerung-steuerung", "section", t("v_steuerung"), t("v_steuerung_text")],
+    ["rollladensteuerung-meldungen", "section", t("v_meldungen"), t("v_meldungen_text")],
+    ["rollladensteuerung", "dashboard", t("zentrale"), t("v_dashboard_text")],
+  ]) {
+    if (!window.customStrategies.some((s) => s.type === type && s.strategyType === strategyType)) {
+      window.customStrategies.push({ type, strategyType, name, description, documentationURL: doku });
+    }
+  }
+}
 
 window.customCards = window.customCards || [];
 window.customCards.push(

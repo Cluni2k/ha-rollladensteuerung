@@ -64,7 +64,8 @@ integration – configured entirely in the UI, with its own dashboard.
   `rollladensteuerung_fahrt` for your own notifications.
 - **Dashboard included:** shutter cards with a gear button (status and all settings as tabs),
   a central card for the global switches and settings, and a dashboard strategy that builds the
-  view automatically (grouped by floor; new shutters appear automatically).
+  view automatically (grouped by floor; new shutters appear automatically), and automatic sections
+  for your own, freely arranged dashboards.
 
 ## Requirements
 
@@ -126,10 +127,31 @@ The gear on a shutter card opens a dialog with the tabs *Status, Basics, Times, 
 Sun protection*. The gear on the central card opens the global settings. Changing settings requires an
 administrator account.
 
-**Arranging it yourself:** a dashboard built by the strategy is generated and therefore read-only. To arrange the cards
-yourself, use *Take control* (⋮ menu when editing) or build the view from the single cards. The layout is then stored in
-your dashboard and survives updates of the integration; new shutters have to be added by hand (card *Rollladen
-(Rollladensteuerung)*).
+**Arranging it yourself (recommended, HA 2026.11+): automatic sections.** In a normal sections view choose
+*Add section → Automatic section → Community*. There are three sections:
+
+| Section | Content | Settings |
+|---|---|---|
+| *Shutters (Rollladensteuerung)* | all shutters of one floor, sorted by name | floor (or *All shutters* / *without floor*), heading |
+| *Shutter control – automation* | central card with switches, all buttons and gear | heading, brightness history on/off |
+| *Shutter control – notifications* | push switches and log | heading |
+
+Move the sections around freely and mix them with your own cards; the layout is stored in your dashboard and survives
+updates. New shutters still appear automatically in the section of their floor (floor of the shutter's area or its
+device's area). Only a completely new floor needs a new section. In YAML:
+```yaml
+type: sections
+sections:
+  - strategy:
+      type: custom:rollladensteuerung
+      stockwerk: ground_floor
+  - strategy:
+      type: custom:rollladensteuerung-steuerung
+  - strategy:
+      type: custom:rollladensteuerung-meldungen
+```
+
+The view built by the dashboard strategy above, on the other hand, is generated and read-only.
 
 ## Settings reference (per shutter)
 
