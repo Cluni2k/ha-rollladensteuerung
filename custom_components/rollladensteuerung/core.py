@@ -190,6 +190,7 @@ class Lage:
 class Fahrt:
     position: int
     grund: str
+    stoppen: bool = False   # läuft gerade eine Fahrt: erst anhalten, kurz warten, dann fahren
 
 
 # Arten von Meldungen (für Protokoll und Push)
@@ -293,6 +294,21 @@ class Rollladen:
         self.z.erwartet_bis = u.jetzt + timedelta(minutes=3)
         self._melde(kategorie(grund), f"{grund} → {ziel} %", ziel)
         return [Fahrt(ziel, grund)]
+
+    def _laufend(self, u: Umgebung, lage: Lage) -> int | None:
+        """Ziel der eigenen automatischen Fahrt, die gerade läuft (None = steht oder wird von Hand gefahren)."""
+        if not lage.faehrt or self.z.erwartet is None:
+            return None
+        if self.z.erwartet_bis and u.jetzt > self.z.erwartet_bis:
+            return None
+        return self.z.erwartet
+
+    def _umlenken(self, u: Umgebung, lage: Lage, ziel: int, grund: str) -> list[Fahrt]:
+        """Laufende Fahrt anhalten und nach einer kurzen Pause zum neuen Ziel fahren."""
+        fahrten = self._fahrt(u, lage, ziel, grund)
+        for f in fahrten:
+            f.stoppen = True
+        return fahrten
 
     def schattenpos(self, u: Umgebung) -> int:
         """Abschattungsposition – fest oder dynamisch nach Sonnenstand (nie dunkler als die feste)."""
@@ -495,15 +511,24 @@ class Rollladen:
                 self.z.zaehler_runter += 1
                 self.z.abschattung_ziel = self.schattenpos(u)
                 return self._fahrt(u, lage, self.z.abschattung_ziel, "Nachträglich abschatten")
+            laufend = self._laufend(u, lage)
             if self.z.nachtschliessen:
                 self.z.nachtschliessen = False
                 self.z.pos_vor_geoeffnet = -1
                 self.z.pos_vor_lueften = -1
                 if steht or pos is None:
                     return self._fahrt(u, lage, self.e.geschlossen_pos, "Fenster zu → Nachtschließen")
+                if laufend is not None and not gleich(laufend, self.e.geschlossen_pos):
+                    return self._umlenken(u, lage, self.e.geschlossen_pos, "Fenster zu → Nachtschließen")
                 return []
             ziel = []
-            if self.z.pos_vor_geoeffnet != -1:
+            if laufend is not None:
+                # die eigene Lüften-/Geöffnet-Fahrt läuft noch: anhalten und gleich zurück
+                if self.z.pos_vor_geoeffnet != -1 and gleich(laufend, self.e.geoeffnet_pos):
+                    ziel = self._umlenken(u, lage, self.z.pos_vor_geoeffnet, "Tür zu → zurück")
+                elif self.z.pos_vor_lueften != -1 and gleich(laufend, self.e.lueften_pos):
+                    ziel = self._umlenken(u, lage, self.z.pos_vor_lueften, "Fenster zu → zurück")
+            elif self.z.pos_vor_geoeffnet != -1:
                 if steht and gleich(pos, self.e.geoeffnet_pos) and not gleich(pos, self.z.pos_vor_geoeffnet):
                     ziel = self._fahrt(u, lage, self.z.pos_vor_geoeffnet, "Tür zu → zurück")
             elif self.z.pos_vor_lueften != -1:
@@ -516,7 +541,15 @@ class Rollladen:
         if not u.auto_komfort or not self.e.luft_fenster_offen:
             return []
 
+        laufend = self._laufend(u, lage)
         if fenster == OFFEN:
+            if laufend is not None and laufend < self.e.geoeffnet_pos - TOLERANZ:
+                # eigene Fahrt läuft zu einem Ziel unter „Geöffnet“: anhalten und auf
+                vor = self.z.pos_vor_lueften if self.z.pos_vor_lueften != -1 else laufend
+                self.z.pos_vor_lueften = -1
+                n = self.e.pos_nach_komfort_oeffnen
+                self.z.pos_vor_geoeffnet = vor if n == -1 else self.e.geoeffnet_pos if n == -2 else n
+                return self._umlenken(u, lage, self.e.geoeffnet_pos, "Tür offen → Geöffnet-Position")
             self.z.pos_vor_lueften = -1
             if steht and pos < self.e.geoeffnet_pos - TOLERANZ:
                 if self.e.pos_nach_komfort_oeffnen == -1:
@@ -532,6 +565,10 @@ class Rollladen:
 
         # gekippt (bzw. einfacher Kontakt offen)
         self.z.pos_vor_geoeffnet = -1
+        if laufend is not None and laufend < self.e.lueften_pos - TOLERANZ:
+            # eigene Fahrt läuft zu einem Ziel unter „Lüften“ (z. B. zurück nach dem Lüften): anhalten und auf
+            self.z.pos_vor_lueften = laufend
+            return self._umlenken(u, lage, self.e.lueften_pos, "Fenster offen → Lüften-Position")
         if steht and pos < self.e.lueften_pos - TOLERANZ:
             self.z.pos_vor_lueften = pos
             return self._fahrt(u, lage, self.e.lueften_pos, "Fenster offen → Lüften-Position")

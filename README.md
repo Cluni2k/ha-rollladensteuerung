@@ -28,7 +28,8 @@ integration – configured entirely in the UI, with its own dashboard.
 
 **Windows and doors**
 - Window **tilted** → ventilation position, door **open** (3-state handle sensor) → opened position,
-  and back again when it is closed. Several contacts per shutter are supported.
+  and back again when it is closed. Several contacts per shutter are supported. If the window changes while
+  the shutter is moving the wrong way, it stops, waits briefly (protects the motor) and reverses.
 - If a window is open at closing time, the shutter **closes as soon as the window is shut**.
 - **Lock-out protection:** never moves down automatically while the door is open.
 

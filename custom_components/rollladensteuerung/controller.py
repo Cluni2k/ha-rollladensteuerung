@@ -70,6 +70,7 @@ from .protokoll import Protokoll
 from .core import kontakt_geaendert, ABSCHATTEN, LUEFTEN, MANUELL, OEFFNEN, SCHLIESSEN, WARNUNG, GEKIPPT, OFFEN, ZU, Einstellungen, Fahrt, Lage, Rollladen, Umgebung, Zustand, als_zeit
 
 _LOGGER = logging.getLogger(__name__)
+PAUSE_RICHTUNGSWECHSEL = 2   # Sekunden zwischen Anhalten und Fahrt in die andere Richtung (schont den Motor)
 _REIHENFOLGE = {ZU: 0, GEKIPPT: 1, OFFEN: 2}
 SCHALTER_NAMEN = {"morgens": "Automatik morgens", "abends": "Automatik abends", "abschattung": "Abschattung",
                   "komfort": "Komfort (Fenster)", "partymodus": "Partymodus", "gast": "Gast anwesend",
@@ -487,6 +488,8 @@ class Steuerung:
             return
         if not await self._bereit(r):
             return
+        if f.stoppen:
+            await self._anhalten(r)
         abstand = float(self.cfg.get(CONF_ABSTAND, 5))
         async with self._sende_sperre:
             if self.hass.is_stopping:
@@ -509,6 +512,19 @@ class Steuerung:
                     {"entity_id": r.e.cover}, blocking=False)
             self.hass.bus.async_fire(EVENT_FAHRT, {"rollladen": r.e.name, "entity_id": r.e.cover,
                                                    "position": f.position, "grund": f.grund})
+
+    async def _anhalten(self, r: Rollladen) -> None:
+        """Laufende Fahrt sofort anhalten (nicht hinter anderen Befehlen anstellen) und dem Motor eine Pause gönnen,
+        bevor es in die andere Richtung geht."""
+        st = self.hass.states.get(r.e.cover)
+        if st is None or st.state not in ("opening", "closing") or self.hass.is_stopping:
+            return
+        merkmale = st.attributes.get(ATTR_SUPPORTED_FEATURES, 0) or 0
+        if merkmale & CoverEntityFeature.STOP:
+            _LOGGER.info("%s: Fahrt angehalten", r.e.name)
+            await self.hass.services.async_call("cover", "stop_cover", {"entity_id": r.e.cover}, blocking=False)
+            self._letzte_sendung = time.monotonic()
+        await asyncio.sleep(PAUSE_RICHTUNGSWECHSEL)
 
     async def _bereit(self, r: Rollladen) -> bool:
         """Nach einem Start warten, bis Home Assistant läuft und der Rollladen erreichbar ist (max. 5 Minuten).

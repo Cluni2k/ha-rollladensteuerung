@@ -25,7 +25,8 @@ Alles wird in der Oberfläche eingestellt, ein passendes Dashboard ist dabei.
 
 **Fenster und Türen**
 - Fenster **gekippt** → Lüften-Position, Tür **offen** (Drehgriff) → Geöffnet-Position, danach zurück.
-  Mehrere Kontakte je Rollladen sind möglich.
+  Mehrere Kontakte je Rollladen sind möglich. Ändert sich das Fenster, während der Rollladen in die falsche
+  Richtung fährt, hält er an, wartet kurz (schont den Motor) und fährt zurück.
 - Ist das Fenster beim abendlichen Schließen offen, schließt der Rollladen, **sobald es zu ist**.
 - **Aussperrschutz:** bei offener Tür nie automatisch herunterfahren.
 

@@ -380,3 +380,39 @@ def test_gleicher_fensterstand_ohne_aktion():
     r = rl(lueften_pos=30)
     r.z.fenster_stand = core.ZU
     assert r.fenster_event(umg(), core.Lage(30, fenster=core.ZU)) == []
+
+
+def test_fenster_auf_waehrend_rueckfahrt_umkehren():
+    """Schlafzimmer 17.11.: Fenster geht wieder auf, während der Rollladen noch zurück nach unten fährt."""
+    r = rl(lueften_pos=30)
+    r.fenster_event(umg(), core.Lage(0, fenster=core.OFFEN))                        # auf → 30
+    f = r.fenster_event(umg(), core.Lage(30, fenster=core.ZU))                      # zu → zurück auf 0
+    assert f[0].position == 0 and not f[0].stoppen
+    f = r.fenster_event(umg(), core.Lage(30, faehrt=True, fenster=core.OFFEN))      # wieder auf, fährt noch
+    assert f[0].position == 30 and f[0].stoppen and r.z.pos_vor_lueften == 0
+    f = r.fenster_event(umg(), core.Lage(30, fenster=core.ZU))
+    assert f[0].position == 0
+
+
+def test_fenster_zu_waehrend_lueftenfahrt_umkehren():
+    r = rl(lueften_pos=30)
+    r.fenster_event(umg(), core.Lage(0, fenster=core.OFFEN))
+    f = r.fenster_event(umg(), core.Lage(0, faehrt=True, fenster=core.ZU))          # zu, bevor 30 % erreicht
+    assert f[0].position == 0 and f[0].stoppen
+
+
+def test_fenster_auf_waehrend_abendfahrt():
+    r = rl(lueften_pos=30, geschlossen_pos=0)
+    r.z.erwartet, r.z.erwartet_bis = 0, T0 + timedelta(minutes=3)                    # Abends schließen läuft
+    f = r.fenster_event(umg(), core.Lage(100, faehrt=True, fenster=core.OFFEN))
+    assert f[0].position == 30 and f[0].stoppen and r.z.pos_vor_lueften == 0
+
+
+def test_fenster_waehrend_fahrt_ohne_eingriff():
+    r = rl(lueften_pos=30)
+    # von Hand gefahren: kein eigenes Ziel bekannt
+    assert r.fenster_event(umg(), core.Lage(100, faehrt=True, fenster=core.OFFEN)) == []
+    # morgens öffnen auf 100 %: Lüften-Position wird ohnehin überfahren
+    r = rl(lueften_pos=30)
+    r.z.erwartet, r.z.erwartet_bis = 100, T0 + timedelta(minutes=3)
+    assert r.fenster_event(umg(), core.Lage(0, faehrt=True, fenster=core.OFFEN)) == []
