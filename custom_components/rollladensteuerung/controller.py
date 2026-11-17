@@ -70,7 +70,7 @@ from .protokoll import Protokoll
 from .core import kontakt_geaendert, ABSCHATTEN, LUEFTEN, MANUELL, OEFFNEN, SCHLIESSEN, WARNUNG, GEKIPPT, OFFEN, ZU, Einstellungen, Fahrt, Lage, Rollladen, Umgebung, Zustand, als_zeit
 
 _LOGGER = logging.getLogger(__name__)
-PAUSE_RICHTUNGSWECHSEL = 2   # Sekunden zwischen Anhalten und Fahrt in die andere Richtung (schont den Motor)
+PAUSE_RICHTUNGSWECHSEL = 1   # Sekunden zwischen Anhalten und Fahrt in die andere Richtung (schont den Motor)
 _REIHENFOLGE = {ZU: 0, GEKIPPT: 1, OFFEN: 2}
 SCHALTER_NAMEN = {"morgens": "Automatik morgens", "abends": "Automatik abends", "abschattung": "Abschattung",
                   "komfort": "Komfort (Fenster)", "partymodus": "Partymodus", "gast": "Gast anwesend",
@@ -536,7 +536,7 @@ class Steuerung:
         if st.state in ("opening", "closing") and merkmale & CoverEntityFeature.STOP:
             _LOGGER.info("%s: Fahrt angehalten", r.e.name)
             await self.hass.services.async_call("cover", "stop_cover", {"entity_id": r.e.cover}, blocking=False)
-            self._letzte_sendung = self._gestoppt[sid] = time.monotonic()
+            self._gestoppt[sid] = time.monotonic()   # zählt nicht zum Funkabstand – ein Stopp belastet kaum
         rest = PAUSE_RICHTUNGSWECHSEL - (time.monotonic() - self._gestoppt.get(sid, float("-inf")))
         if rest > 0:
             await asyncio.sleep(rest)
