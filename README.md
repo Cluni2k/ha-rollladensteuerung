@@ -64,6 +64,11 @@ integration – configured entirely in the UI, with its own dashboard.
 - **Staggered commands** with an adjustable delay (protects e.g. the Homematic duty cycle) – also for
   **open all / ventilate all / shade all / close all**, each shutter to its own configured position.
 - Shutters and brightness sensors are **added, changed and removed in the UI**; hidden entities are not offered.
+- **Renamed entities are followed automatically** (also renames made while the integration was not running); entities
+  that no longer exist or are disabled are reported under *Settings → Repairs*, where you pick a replacement directly.
+- **Robust against restarts and radio dropouts:** a window contact that is briefly unavailable and comes back with the same
+  value is no change; commands wait after a start until Home Assistant runs and the shutter is reachable (max. 5 min),
+  and nothing is sent while Home Assistant shuts down.
 - Sensors for the **next opening/closing**, a **status sensor** with all internal flags, and the event
   `rollladensteuerung_fahrt` for your own notifications.
 - **Dashboard included:** shutter cards with a gear button (status and all settings as tabs),

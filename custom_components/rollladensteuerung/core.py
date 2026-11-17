@@ -211,6 +211,42 @@ def kategorie(grund: str) -> str:
     return FAHRT
 
 
+UNGUELTIG = ("unknown", "unavailable", "")
+
+
+def kontakt_geaendert(vorher: str | None, alt: str | None, neu: str | None) -> bool:
+    """Hat sich ein Fensterkontakt wirklich geändert?
+
+    vorher = letzter gültiger Zustand (auch über einen Neustart gemerkt), alt/neu = Zustände des Ereignisses.
+    Ein Kontakt, der kurz nicht erreichbar war (Neustart, Funkaussetzer) und mit demselben Wert zurückkommt,
+    ist keine Änderung; der erste gültige Wert ohne bekannten Vorwert wird ohne Fahrt übernommen.
+    """
+    if neu is None or neu in UNGUELTIG:
+        return False
+    if alt is None or alt in UNGUELTIG:
+        return vorher is not None and vorher != neu
+    return alt != neu
+
+
+def verweis_ersetzen(daten: dict, schluessel: tuple[str, ...], alt: str, neu: str | None) -> dict | None:
+    """Entität `alt` in den Feldern `schluessel` durch `neu` ersetzen (None/"" = entfernen).
+
+    Gibt die geänderten Daten zurück oder None, wenn `alt` dort nicht vorkommt.
+    """
+    aus = dict(daten)
+    geaendert = False
+    for k in schluessel:
+        wert = aus.get(k)
+        if isinstance(wert, list) and alt in wert:
+            liste = [neu if w == alt else w for w in wert if neu or w != alt]
+            aus[k] = list(dict.fromkeys(liste))   # keine Dubletten
+            geaendert = True
+        elif wert == alt:
+            aus[k] = neu or ""
+            geaendert = True
+    return aus if geaendert else None
+
+
 @dataclass
 class Rollladen:
     e: Einstellungen

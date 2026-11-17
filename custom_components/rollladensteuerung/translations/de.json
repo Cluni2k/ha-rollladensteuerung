@@ -413,5 +413,21 @@
       "name": "Alle schließen",
       "description": "Fährt jeden Rollladen auf seine eingestellte Geschlossen-Position."
     }
+  },
+  "issues": {
+    "fehlende_entitaeten": {
+      "title": "Rollladensteuerung: Entitäten fehlen",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Fehlende Entitäten ersetzen",
+            "description": "Diese Entitäten gibt es nicht mehr oder sie sind deaktiviert:\n\n{liste}\n\nWähle für jede einen Ersatz. Ein geleertes Feld entfernt die Entität aus den Einstellungen (bei Rollläden und Helligkeitssensoren nicht möglich – dort den Eintrag in der Integration löschen)."
+          }
+        },
+        "abort": {
+          "entfernt": "Die Rollladensteuerung ist nicht mehr eingerichtet."
+        }
+      }
+    }
   }
 }

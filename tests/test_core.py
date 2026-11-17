@@ -314,3 +314,50 @@ def test_urlaub_mehr_zufall():
     werte = {r.zeiten_berechnen(date(2026, 7, 1), False, auf, auf, TZ, random.Random(s), zufall_extra=30)[0]
              for s in range(20)}
     assert len(werte) > 1 and all(datetime(2026, 7, 1, 9, 0, tzinfo=TZ) <= w <= datetime(2026, 7, 1, 9, 30, tzinfo=TZ) for w in werte)
+
+
+# ---------------------------------------------------------------- Fensterkontakt nicht erreichbar
+def test_kontakt_normaler_wechsel():
+    assert core.kontakt_geaendert("off", "off", "on")
+    assert not core.kontakt_geaendert("on", "on", "on")
+
+
+def test_kontakt_aussetzer_gleicher_wert_ist_keine_aenderung():
+    # gekippt → kurz unavailable → wieder gekippt: Lüften-Rückkehr darf nicht verloren gehen
+    assert not core.kontakt_geaendert("tilted", "unavailable", "tilted")
+    assert not core.kontakt_geaendert("on", "unknown", "on")
+
+
+def test_kontakt_aussetzer_anderer_wert_ist_aenderung():
+    # während des Aussetzers geschlossen → zurückfahren
+    assert core.kontakt_geaendert("tilted", "unavailable", "closed")
+
+
+def test_kontakt_erster_wert_ohne_vorwert_faehrt_nicht():
+    assert not core.kontakt_geaendert(None, "unavailable", "off")
+    assert not core.kontakt_geaendert(None, None, "on")
+
+
+def test_kontakt_wird_unerreichbar_ist_keine_aenderung():
+    assert not core.kontakt_geaendert("on", "on", "unavailable")
+
+
+# ---------------------------------------------------------------- Entitäten umbenennen/ersetzen
+def test_verweis_ersetzen_einzeln_und_liste():
+    d = {"cover": "cover.alt", "fenster": ["binary_sensor.a", "binary_sensor.b"], "name": "cover.alt"}
+    assert core.verweis_ersetzen(d, ("cover", "fenster"), "cover.alt", "cover.neu") == {
+        "cover": "cover.neu", "fenster": ["binary_sensor.a", "binary_sensor.b"], "name": "cover.alt"}
+    assert core.verweis_ersetzen(d, ("cover", "fenster"), "binary_sensor.a", "binary_sensor.c")["fenster"] == [
+        "binary_sensor.c", "binary_sensor.b"]
+
+
+def test_verweis_entfernen_und_dublette():
+    d = {"fenster": ["binary_sensor.a", "binary_sensor.b"], "schlaf": "switch.x"}
+    assert core.verweis_ersetzen(d, ("fenster", "schlaf"), "binary_sensor.a", None)["fenster"] == ["binary_sensor.b"]
+    assert core.verweis_ersetzen(d, ("fenster", "schlaf"), "binary_sensor.a", "binary_sensor.b")["fenster"] == [
+        "binary_sensor.b"]
+    assert core.verweis_ersetzen(d, ("fenster", "schlaf"), "switch.x", "")["schlaf"] == ""
+
+
+def test_verweis_nicht_vorhanden():
+    assert core.verweis_ersetzen({"cover": "cover.a"}, ("cover",), "cover.b", "cover.c") is None

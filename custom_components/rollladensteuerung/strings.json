@@ -413,5 +413,21 @@
       "name": "Close all",
       "description": "Moves every shutter to its configured closed position."
     }
+  },
+  "issues": {
+    "fehlende_entitaeten": {
+      "title": "Shutter control: entities missing",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Replace missing entities",
+            "description": "These entities no longer exist or are disabled:\n\n{liste}\n\nPick a replacement for each. An empty field removes the entity from the settings (not possible for shutters and brightness sensors – delete the entry in the integration instead)."
+          }
+        },
+        "abort": {
+          "entfernt": "The shutter control is no longer set up."
+        }
+      }
+    }
   }
 }

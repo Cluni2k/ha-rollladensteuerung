@@ -62,6 +62,12 @@ Alles wird in der Oberfläche eingestellt, ein passendes Dashboard ist dabei.
   **Alle öffnen / lüften / abschatten / schließen**, jeder Rollladen auf seine eigene Position.
 - Rollläden und Helligkeitssensoren werden in der Oberfläche **hinzugefügt, geändert und gelöscht**;
   ausgeblendete Entitäten werden nicht angeboten.
+- **Umbenannte Entitäten werden automatisch übernommen** (auch Umbenennungen, während die Integration nicht lief);
+  Entitäten, die es nicht mehr gibt oder die deaktiviert sind, erscheinen unter *Einstellungen → Reparaturen* –
+  dort wählt man direkt einen Ersatz.
+- **Robust bei Neustarts und Funkaussetzern:** Ein Fensterkontakt, der kurz nicht erreichbar ist und mit demselben Wert
+  zurückkommt, gilt nicht als Änderung; Fahrbefehle warten nach einem Start, bis Home Assistant läuft und der Rollladen
+  erreichbar ist (max. 5 Minuten), und beim Herunterfahren wird nichts mehr gesendet.
 - Sensoren für **nächstes Öffnen/Schließen**, ein **Status-Sensor** mit allen Merkern und das Ereignis
   `rollladensteuerung_fahrt` für eigene Benachrichtigungen.
 - **Dashboard inklusive:** Rollladen-Karten mit Zahnrad (Status und alle Einstellungen als Karteikarten),

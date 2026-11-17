@@ -8,7 +8,7 @@
  *    custom:rollladensteuerung (Rollläden eines Stockwerks), custom:rollladensteuerung-steuerung,
  *    custom:rollladensteuerung-meldungen
  */
-const VERSION = "0.6.2";
+const VERSION = "0.7.0";
 
 const TEXTE = {
   de: {
@@ -68,6 +68,8 @@ const TEXTE = {
     v_dashboard_text: "All shutters by floor with automation and notifications",
   },
 };
+// Text sicher ins HTML einsetzen (Namen kommen aus Einstellungen und anderen Integrationen)
+const esc = (text) => String(text ?? "").replace(/[&<>"']/g, (z) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[z]);
 const tx = (hass, key) => (TEXTE[(hass?.language || "en").split("-")[0]] || TEXTE.en)[key] || key;
 
 /* ---------------------------------------------------------------- Konfiguration (zwischengespeichert) */
@@ -545,10 +547,10 @@ class EinstellDialog extends HTMLElement {
     const box = document.createElement("div");
     box.className = "auswahl";
     const listenId = `liste-${s.name}-${Math.random().toString(36).slice(2, 8)}`;
-    box.innerHTML = `<label>${label}${s.required ? " *" : ""}</label><div class="chips"></div>
+    box.innerHTML = `<label>${esc(label)}${s.required ? " *" : ""}</label><div class="chips"></div>
       <div class="eingabe"><input list="${listenId}" placeholder="${mehrfach ? "+ " : ""}${tx(h, "auswaehlen")}">
       <button class="leeren" title="${tx(h, "entfernen")}"><ha-icon icon="mdi:close"></ha-icon></button></div>
-      <datalist id="${listenId}">${passend.map((st) => `<option value="${st.entity_id}">${(st.attributes.friendly_name || "").replace(/"/g, "&quot;")}</option>`).join("")}</datalist>`;
+      <datalist id="${listenId}">${passend.map((st) => `<option value="${esc(st.entity_id)}">${esc(st.attributes.friendly_name || "")}</option>`).join("")}</datalist>`;
     const chips = box.querySelector(".chips");
     const eingabe = box.querySelector("input");
     const leeren = box.querySelector(".leeren");
@@ -560,7 +562,7 @@ class EinstellDialog extends HTMLElement {
         for (const eid of wert() || []) {
           const c = document.createElement("span");
           c.className = "chip";
-          c.innerHTML = `<span>${anzeige(eid)}</span><small>${eid}</small><button title="${tx(h, "entfernen")}">×</button>`;
+          c.innerHTML = `<span>${esc(anzeige(eid))}</span><small>${esc(eid)}</small><button title="${tx(h, "entfernen")}">×</button>`;
           c.querySelector("button").addEventListener("click", () => setzen((wert() || []).filter((x) => x !== eid)));
           chips.appendChild(c);
         }
@@ -643,8 +645,8 @@ class EinstellDialog extends HTMLElement {
   _liste(inhalt) {
     const h = this.hass;
     const pfad = "/config/integrations/integration/rollladensteuerung";
-    inhalt.innerHTML = `<h3>${tx(h, "rolllaeden")}</h3><ul>${this._k.rolllaeden.map((r) => `<li>${r.name} <small>(${r.cover})</small></li>`).join("")}</ul>
-      <h3>${tx(h, "helligkeit")}</h3><ul>${this._k.helligkeit.map((s) => `<li>${s.name} <small>(${s.entity})</small></li>`).join("")}</ul>
+    inhalt.innerHTML = `<h3>${tx(h, "rolllaeden")}</h3><ul>${this._k.rolllaeden.map((r) => `<li>${esc(r.name)} <small>(${esc(r.cover)})</small></li>`).join("")}</ul>
+      <h3>${tx(h, "helligkeit")}</h3><ul>${this._k.helligkeit.map((s) => `<li>${esc(s.name)} <small>(${esc(s.entity)})</small></li>`).join("")}</ul>
       <a class="link">${tx(h, "hinzufuegen")} →</a>`;
     inhalt.querySelector(".link").addEventListener("click", () => { this.remove(); navigieren(pfad); });
   }

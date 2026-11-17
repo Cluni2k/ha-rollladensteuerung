@@ -14,7 +14,9 @@ from homeassistant.components.cover import ATTR_CURRENT_POSITION, CoverEntityFea
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_SUPPORTED_FEATURES, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.event import (
     async_call_later,
     async_track_point_in_time,
@@ -63,8 +65,9 @@ from .const import (
     SUB_HELLIGKEIT,
     SUB_ROLLLADEN,
 )
+from . import entitaeten
 from .protokoll import Protokoll
-from .core import ABSCHATTEN, LUEFTEN, MANUELL, OEFFNEN, SCHLIESSEN, WARNUNG, GEKIPPT, OFFEN, ZU, Einstellungen, Fahrt, Lage, Rollladen, Umgebung, Zustand, als_zeit
+from .core import kontakt_geaendert, ABSCHATTEN, LUEFTEN, MANUELL, OEFFNEN, SCHLIESSEN, WARNUNG, GEKIPPT, OFFEN, ZU, Einstellungen, Fahrt, Lage, Rollladen, Umgebung, Zustand, als_zeit
 
 _LOGGER = logging.getLogger(__name__)
 _REIHENFOLGE = {ZU: 0, GEKIPPT: 1, OFFEN: 2}
@@ -122,6 +125,8 @@ class Steuerung:
         self._ruhe: dict[str, Any] = {}           # Rollladen → Timer: erst auswerten, wenn er wirklich steht
         self._zuletzt: dict[str, tuple] = {}      # Rollladen → (Position, Zeit) der letzten ausgewerteten Meldung
         self._dunkel_seit: dict[str, datetime] = {}
+        self._kontakt: dict[str, str] = {}        # Fensterkontakt → letzter gültiger Zustand (über Neustarts)
+        self._registry: dict[str, str] = {}       # Entität → Registry-ID (Umbenennungen nachholen)
         self.rauchmelder: list[str] = list(self.cfg.get(CONF_RAUCH) or [])
 
         hell = {sid: s.data.get(CONF_ENTITY) for sid, s in entry.subentries.items()
@@ -148,12 +153,22 @@ class Steuerung:
             r.e.aktiv = self.aktiv[sid]
         self._tagesmeldung = dict(daten.get("tagesmeldung") or {})
         self._gewarnt = dict(daten.get("gewarnt") or {})
+        self._kontakt = dict(daten.get("kontakt") or {})
+        # Umbenennungen, die passiert sind, während die Steuerung nicht lief → übernehmen und neu laden
+        if entitaeten.umbenennungen_nachholen(self.hass, self.entry, dict(daten.get("registry") or {})):
+            self.hass.config_entries.async_schedule_reload(self.entry.entry_id)
+            return
+        self._registry = entitaeten.registry_ids(self.hass, self.entry)
 
         covers = [r.e.cover for r in self.rolllaeden.values()]
         fenster = sorted({f for liste in self.fenster.values() for f in liste})
         hell = sorted({h for h in self.helligkeit.values() if h})
         if covers:
             self._abmelden.append(async_track_state_change_event(self.hass, covers, self._cover_geaendert))
+        for eid in fenster:
+            st = self.hass.states.get(eid)
+            if st is not None and st.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE) and eid not in self._kontakt:
+                self._kontakt[eid] = st.state
         if fenster:
             self._abmelden.append(async_track_state_change_event(self.hass, fenster, self._fenster_geaendert))
         if hell:
@@ -182,10 +197,38 @@ class Steuerung:
                 if st is None or st.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
                     self._ausfall_beginnt(eid)
         self.protokoll.eintragen("Zentrale", "info", f"Steuerung gestartet ({len(self.rolllaeden)} Rollläden)")
+        # umbenannte Entitäten übernehmen, fehlende/deaktivierte unter „Reparaturen“ melden
+        self._abmelden.append(self.hass.bus.async_listen(er.EVENT_ENTITY_REGISTRY_UPDATED, self._registry_geaendert))
+        self._abmelden.append(async_at_started(self.hass, self._nach_start))
         for sid in self.rolllaeden:
             # nach einem Neustart die geplanten Zeiten behalten – nach geänderten Einstellungen neu rechnen
             await self.async_zeiten_planen(sid, behalten=self._zeitbasis.get(sid) == self._basis(sid))
         self._melden()
+
+    async def _nach_start(self, _hass: HomeAssistant) -> None:
+        """Erst prüfen, wenn alle Integrationen geladen sind (sonst fehlen Entitäten nur scheinbar)."""
+        self._abmelden.append(async_call_later(self.hass, 30, self._fehlende_pruefen))
+
+    @callback
+    def _fehlende_pruefen(self, _now=None) -> None:
+        fehl = entitaeten.pruefen(self.hass, self.entry)
+        for eid, (grund, vs) in fehl.items():
+            if self._gewarnt.get(f"fehlt:{eid}") == str(dt_util.now().date()):
+                continue
+            self._gewarnt[f"fehlt:{eid}"] = str(dt_util.now().date())
+            wo = ", ".join(sorted({v.wo for v in vs}))
+            self.protokoll.eintragen("Zentrale", "warnung", f"Entität {eid} {grund} ({wo}) – siehe Einstellungen → Reparaturen")
+        self._speichern()
+
+    async def _registry_geaendert(self, event: Event) -> None:
+        aktion, eid = event.data.get("action"), event.data.get("entity_id")
+        bekannt = {v.entity_id for v in entitaeten.verweise(self.entry)}
+        if aktion == "update" and (alt := event.data.get("old_entity_id")) and alt in bekannt:
+            self.protokoll.eintragen("Zentrale", "info", f"Entität umbenannt: {alt} → {eid} (übernommen)")
+            entitaeten.ersetzen(self.hass, self.entry, alt, eid)   # lädt die Steuerung neu
+            return
+        if eid in bekannt and aktion in ("remove", "update", "create"):
+            self._abmelden.append(async_call_later(self.hass, 5, self._fehlende_pruefen))
 
     async def async_stop(self) -> None:
         for aufgabe in list(self._aufgaben):
@@ -213,7 +256,8 @@ class Steuerung:
 
     def _daten(self) -> dict:
         return {"schalter": self.schalter, "aktiv": self.aktiv, "zeitbasis": self._zeitbasis,
-                "tagesmeldung": self._tagesmeldung, "gewarnt": self._gewarnt,
+                "tagesmeldung": self._tagesmeldung, "gewarnt": self._gewarnt, "kontakt": self._kontakt,
+                "registry": self._registry,
                 "rolllaeden": {sid: r.z.speichern() for sid, r in self.rolllaeden.items()}}
 
     @callback
@@ -267,12 +311,15 @@ class Steuerung:
         zweistufig = True
         for eid in self.fenster.get(sid, []):
             fst = self.hass.states.get(eid)
-            if fst is None or fst.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
-                continue
+            wert = fst.state if fst is not None else None
+            if wert in (None, STATE_UNKNOWN, STATE_UNAVAILABLE):
+                wert = self._kontakt.get(eid)   # kurz nicht erreichbar: letzter bekannter Zustand
+                if wert is None:
+                    continue
             if eid.startswith("binary_sensor."):
-                w = OFFEN if fst.state == "on" else ZU
+                w = OFFEN if wert == "on" else ZU
             else:
-                w = _DREHGRIFF.get(fst.state.lower())
+                w = _DREHGRIFF.get(wert.lower())
                 if w is None:
                     continue
                 zweistufig = False
@@ -436,8 +483,12 @@ class Steuerung:
         r = self.rolllaeden.get(sid)
         if r is None:
             return
+        if not await self._bereit(r):
+            return
         abstand = float(self.cfg.get(CONF_ABSTAND, 5))
         async with self._sende_sperre:
+            if self.hass.is_stopping:
+                return
             warten = abstand - (time.monotonic() - self._letzte_sendung)
             if warten > 0:
                 await asyncio.sleep(warten)
@@ -456,6 +507,19 @@ class Steuerung:
                     {"entity_id": r.e.cover}, blocking=False)
             self.hass.bus.async_fire(EVENT_FAHRT, {"rollladen": r.e.name, "entity_id": r.e.cover,
                                                    "position": f.position, "grund": f.grund})
+
+    async def _bereit(self, r: Rollladen) -> bool:
+        """Nach einem Start warten, bis Home Assistant läuft und der Rollladen erreichbar ist (max. 5 Minuten).
+        Beim Herunterfahren nichts mehr senden."""
+        for _ in range(60):
+            if self.hass.is_stopping:
+                return False
+            st = self.hass.states.get(r.e.cover)
+            if self.hass.is_running and st is not None and st.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+                return True
+            await asyncio.sleep(5)
+        self.protokoll.eintragen(r.e.name, "warnung", "Fahrt nicht gesendet – Rollladen nicht erreichbar")
+        return False
 
     # ------------------------------------------------------------------ Zeitpläne
     async def _werktag(self, tag: date) -> bool:
@@ -606,7 +670,11 @@ class Steuerung:
         neu, alt = event.data.get("new_state"), event.data.get("old_state")
         if neu is None or neu.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
             return
-        if alt is not None and alt.state == neu.state:
+        vorher = self._kontakt.get(eid)
+        self._kontakt[eid] = neu.state
+        if vorher != neu.state:
+            self._speichern()
+        if not kontakt_geaendert(vorher, alt.state if alt else None, neu.state):
             return
         u = self.umgebung()
         for sid, liste in self.fenster.items():

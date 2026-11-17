@@ -157,6 +157,19 @@ def bauen(i):
         "entity": {"sensor": {**{k: {"name": t(v)} for k, v in ENTITAETEN["sensor"].items()}},
                    "switch": {k: {"name": t(v)} for k, v in ENTITAETEN["switch"].items()}},
         "services": {k: {"name": t(n), "description": t(b)} for k, (n, b) in DIENSTE.items()},
+        "issues": {"fehlende_entitaeten": {
+            "title": t(L("Rollladensteuerung: Entitäten fehlen", "Shutter control: entities missing")),
+            "fix_flow": {
+                "step": {"init": {
+                    "title": t(L("Fehlende Entitäten ersetzen", "Replace missing entities")),
+                    "description": t(L(
+                        "Diese Entitäten gibt es nicht mehr oder sie sind deaktiviert:\n\n{liste}\n\n"
+                        "Wähle für jede einen Ersatz. Ein geleertes Feld entfernt die Entität aus den Einstellungen "
+                        "(bei Rollläden und Helligkeitssensoren nicht möglich – dort den Eintrag in der Integration löschen).",
+                        "These entities no longer exist or are disabled:\n\n{liste}\n\n"
+                        "Pick a replacement for each. An empty field removes the entity from the settings "
+                        "(not possible for shutters and brightness sensors – delete the entry in the integration instead)."))}},
+                "abort": {"entfernt": t(L("Die Rollladensteuerung ist nicht mehr eingerichtet.", "The shutter control is no longer set up."))}}}},
     } | {"entity": {"sensor": {**{k: {"name": t(v)} for k, v in ENTITAETEN["sensor"].items()},
                                "status": {"name": t(ENTITAETEN["sensor"]["status"]),
                                           "state": {k: t(v) for k, v in STATUS.items()}}},
