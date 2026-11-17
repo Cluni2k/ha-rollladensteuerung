@@ -125,6 +125,7 @@ class Zustand:
     letzte_meldung: str = ""
     oeffnen_nachholen: bool = False             # morgens nicht geöffnet, weil jemand schlief
     abschattung_ziel: int = -1                  # aktuell angefahrene Abschattungsposition
+    fenster_stand: str | None = None            # zuletzt verarbeiteter Gesamtzustand aller Kontakte
 
     def speichern(self) -> dict:
         daten = asdict(self)
@@ -465,10 +466,18 @@ class Rollladen:
 
     # ------------------------------------------------------------------ Fenster
     def fenster_event(self, u: Umgebung, lage: Lage) -> list[Fahrt]:
-        """Auto_Fenster_Komfort (Fensterkontakt-Teil)."""
+        """Auto_Fenster_Komfort (Fensterkontakt-Teil).
+
+        Reagiert nur, wenn sich der Gesamtzustand aller Kontakte des Rollladens ändert: Öffnet oder schließt
+        bei zwei Fenstern das zweite, während das erste noch offen ist, bleibt es bei „gekippt“ – das darf die
+        gemerkte Position nicht löschen.
+        """
+        fenster = self._fenster(lage)
+        if fenster == self.z.fenster_stand:
+            return []
+        self.z.fenster_stand = fenster
         if not self.e.aktiv:
             return []
-        fenster = self._fenster(lage)
         pos = lage.position
         steht = not lage.faehrt and pos is not None
 

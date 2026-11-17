@@ -169,6 +169,8 @@ class Steuerung:
             st = self.hass.states.get(eid)
             if st is not None and st.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE) and eid not in self._kontakt:
                 self._kontakt[eid] = st.state
+        for sid, r in self.rolllaeden.items():   # Ausgangslage, damit nur echte Änderungen zählen
+            r.z.fenster_stand = r._fenster(self.lage(sid)) if self.fenster.get(sid) else None
         if fenster:
             self._abmelden.append(async_track_state_change_event(self.hass, fenster, self._fenster_geaendert))
         if hell:

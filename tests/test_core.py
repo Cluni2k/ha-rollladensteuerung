@@ -361,3 +361,22 @@ def test_verweis_entfernen_und_dublette():
 
 def test_verweis_nicht_vorhanden():
     assert core.verweis_ersetzen({"cover": "cover.a"}, ("cover",), "cover.b", "cover.c") is None
+
+
+def test_zwei_fenster_lueften_und_zurueck():
+    """Küche 17.11.: zweites Fenster geht kurz nach dem ersten auf bzw. zu – Position darf nicht verloren gehen."""
+    r = rl(lueften_pos=30)
+    f = r.fenster_event(umg(), core.Lage(0, fenster=core.OFFEN))          # rechts auf
+    assert f[0].position == 30 and r.z.pos_vor_lueften == 0
+    assert r.fenster_event(umg(), core.Lage(0, faehrt=True, fenster=core.OFFEN)) == []   # links auf, fährt noch
+    assert r.z.pos_vor_lueften == 0
+    assert r.fenster_event(umg(), core.Lage(30, fenster=core.OFFEN)) == []  # links zu, rechts noch offen
+    assert r.z.pos_vor_lueften == 0
+    f = r.fenster_event(umg(), core.Lage(30, fenster=core.ZU))              # beide zu
+    assert f[0].position == 0
+
+
+def test_gleicher_fensterstand_ohne_aktion():
+    r = rl(lueften_pos=30)
+    r.z.fenster_stand = core.ZU
+    assert r.fenster_event(umg(), core.Lage(30, fenster=core.ZU)) == []
