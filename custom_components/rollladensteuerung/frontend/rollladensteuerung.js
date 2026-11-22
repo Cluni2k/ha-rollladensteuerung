@@ -14,7 +14,7 @@ const VERSION = "0.8.0";
 const TEXTE = {
   de: {
     speichern: "Speichern", abbrechen: "Abbrechen", schliessen: "Schließen", status: "Status",
-    einstellungen: "Einstellungen", alle_oeffnen: "Alle öffnen", alle_schliessen: "Alle schließen", alle_lueften: "Alle lüften", alle_abschatten: "Alle abschatten",
+    lueften: "Lüften", einstellungen: "Einstellungen", alle_oeffnen: "Alle öffnen", alle_schliessen: "Alle schließen", alle_lueften: "Alle lüften", alle_abschatten: "Alle abschatten",
     raumtemp: "Raumtemperatur", vorhersage: "Heute erwartet (max.)", schlaeft: "Schläft noch", schatten_ziel: "Abschattungsposition jetzt",
     oeffnet: "Öffnet", schliesst: "Schließt", automatik: "Automatik", zentrale: "Rollladensteuerung",
     gespeichert: "Gespeichert", fehler: "Fehler", hinzufuegen: "Rollladen oder Helligkeitssensor hinzufügen/löschen",
@@ -50,7 +50,7 @@ const TEXTE = {
   },
   en: {
     speichern: "Save", abbrechen: "Cancel", schliessen: "Close", status: "Status",
-    einstellungen: "Settings", alle_oeffnen: "Open all", alle_schliessen: "Close all", alle_lueften: "Ventilate all", alle_abschatten: "Shade all",
+    lueften: "Ventilate", einstellungen: "Settings", alle_oeffnen: "Open all", alle_schliessen: "Close all", alle_lueften: "Ventilate all", alle_abschatten: "Shade all",
     raumtemp: "Room temperature", vorhersage: "Forecast today (max)", schlaeft: "Still asleep", schatten_ziel: "Shading position now",
     oeffnet: "Opens", schliesst: "Closes", automatik: "Automation", zentrale: "Shutter control",
     gespeichert: "Saved", fehler: "Error", hinzufuegen: "Add/remove shutters or brightness sensors",
@@ -185,6 +185,10 @@ const GEMEINSAM_CSS = `
 `;
 
 /* ---------------------------------------------------------------- Rollladen-Karte */
+// Symbol „gelüfteter Rollladen“: Kasten oben, Lamellen mit offenen Lüftungsschlitzen
+const LUEFTEN_SYMBOL = `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" style="fill: currentColor">
+  <path d="M2 2h20v4H2z"/><path d="M2.5 6h1.5v16H2.5zM20 6h1.5v16H20z"/>
+  <path d="M5 7.5h14v1.3H5zM5 11.3h14v1.3H5zM5 15.1h14v1.3H5zM5 18.9h14v1.3H5z"/></svg>`;
 class RollladenKarte extends HTMLElement {
   setConfig(config) {
     if (!config.entity && !config.sid) throw new Error("entity (Rollladen) fehlt");
@@ -224,7 +228,7 @@ class RollladenKarte extends HTMLElement {
     this._aufgebaut = true;
     const root = this.attachShadow({ mode: "open" });
     root.innerHTML = `
-      <style>${GEMEINSAM_CSS}</style>
+      <style>${GEMEINSAM_CSS} .tasten button[hidden] { display: none; } .tasten button svg { width: 24px; height: 24px; }</style>
       <ha-card>
         <div class="kopf">
           <div class="symbol"><ha-state-icon></ha-state-icon></div>
@@ -235,6 +239,7 @@ class RollladenKarte extends HTMLElement {
           <button data-dienst="open_cover"><ha-icon icon="mdi:arrow-up"></ha-icon></button>
           <button data-dienst="stop_cover"><ha-icon icon="mdi:stop"></ha-icon></button>
           <button data-dienst="close_cover"><ha-icon icon="mdi:arrow-down"></ha-icon></button>
+          <button class="lueften" hidden>${LUEFTEN_SYMBOL}</button>
         </div>
         <div class="regler"><div class="fuellung"></div><div class="griff"></div></div>
         <div class="auto"><ha-icon icon="mdi:window-shutter-auto"></ha-icon><span class="status"></span>
@@ -243,8 +248,13 @@ class RollladenKarte extends HTMLElement {
     root.querySelector(".symbol").addEventListener("click", () => mehrInfo(this, this._cover));
     root.querySelector(".text").addEventListener("click", () => mehrInfo(this, this._cover));
     root.querySelector(".zahnrad").addEventListener("click", () => this._dialog());
-    root.querySelectorAll(".tasten button").forEach((b) =>
+    root.querySelectorAll(".tasten button[data-dienst]").forEach((b) =>
       b.addEventListener("click", () => this._hass.callService("cover", b.dataset.dienst, { entity_id: this._cover })));
+    // Lüften: auf die eingestellte Lüften-Position dieses Rollladens fahren
+    root.querySelector(".lueften").addEventListener("click", () => {
+      const p = this._lueftenPos();
+      if (p !== undefined) this._hass.callService("cover", "set_cover_position", { entity_id: this._cover, position: p });
+    });
     const regler = root.querySelector(".regler");
     const wert = (ev) => {
       const r = regler.getBoundingClientRect();
@@ -270,6 +280,11 @@ class RollladenKarte extends HTMLElement {
     regler.addEventListener("pointercancel", ende);
   }
 
+  _lueftenPos() {
+    const p = Number(this._rl?.daten?.lueften_pos);
+    return Number.isFinite(p) ? p : undefined;
+  }
+
   _regler(p) {
     const r = this.shadowRoot;
     r.querySelector(".fuellung").style.width = `${p}%`;
@@ -291,10 +306,17 @@ class RollladenKarte extends HTMLElement {
     icon.stateObj = st;
     const text = this._hass.formatEntityState ? this._hass.formatEntityState(st) : st.state;
     r.querySelector(".zustand").textContent = pos !== undefined ? `${text} · ${pos} %` : text;
-    const [hoch, halt, runter] = r.querySelectorAll(".tasten button");
+    const [hoch, halt, runter] = r.querySelectorAll(".tasten button[data-dienst]");
     hoch.disabled = pos === 100 || st.state === "opening";
     runter.disabled = pos === 0 || st.state === "closing";
     halt.disabled = false;
+    const lueften = r.querySelector(".lueften");
+    const lp = this._lueftenPos();
+    lueften.hidden = lp === undefined || st.attributes.supported_features !== undefined && !(st.attributes.supported_features & 4);
+    if (lp !== undefined) {
+      lueften.title = `${tx(this._hass, "lueften")} (${lp} %)`;
+      lueften.disabled = pos === lp && st.state !== "opening" && st.state !== "closing";
+    }
     if (this._ziehen === undefined) this._regler(pos ?? (offen ? 100 : 0));
     const auto = r.querySelector(".auto");
     if (!this._rl) { auto.style.display = "none"; return; }
