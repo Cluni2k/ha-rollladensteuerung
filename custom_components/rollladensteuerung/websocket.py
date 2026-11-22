@@ -15,9 +15,11 @@ from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.loader import async_get_integration
+from homeassistant.util import dt as dt_util
 
 from .config_flow import global_schema, rollladen_schema
 from .const import CONF_PUSH, DOMAIN, PUSH, SCHALTER, SUB_HELLIGKEIT, SUB_ROLLLADEN
+from .protokoll import AUFBEWAHRUNG_TAGE
 from .felder import GLOBAL_STANDARD, OPTIONAL, STANDARD, TABS, bereinigen, global_felder, rollladen_felder
 
 _TEXTE: dict[str, dict] = {}
@@ -109,14 +111,22 @@ async def ws_konfig(hass: HomeAssistant, connection: websocket_api.ActiveConnect
 
 
 @websocket_api.websocket_command({vol.Required("type"): "rollladensteuerung/protokoll",
-                                  vol.Optional("tage", default=14): int})
+                                  vol.Optional("tage", default=AUFBEWAHRUNG_TAGE): int,
+                                  vol.Optional("von"): str, vol.Optional("bis"): str})
 @websocket_api.async_response
 async def ws_protokoll(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
     entry = _eintrag(hass)
     if entry is None:
         connection.send_error(msg["id"], "nicht_geladen", "Rollladensteuerung ist nicht eingerichtet")
         return
-    eintraege = await entry.runtime_data.protokoll.lesen(msg["tage"])
+    von = dt_util.parse_datetime(msg["von"]) if msg.get("von") else None
+    bis = dt_util.parse_datetime(msg["bis"]) if msg.get("bis") else None
+    if (msg.get("von") and von is None) or (msg.get("bis") and bis is None):
+        connection.send_error(msg["id"], "ungueltig", "Zeitraum ungültig")
+        return
+    von = dt_util.as_local(von) if von and von.tzinfo else von and von.replace(tzinfo=dt_util.get_default_time_zone())
+    bis = dt_util.as_local(bis) if bis and bis.tzinfo else bis and bis.replace(tzinfo=dt_util.get_default_time_zone())
+    eintraege = await entry.runtime_data.protokoll.lesen(msg["tage"], von, bis)
     connection.send_result(msg["id"], {"eintraege": list(reversed(eintraege))})
 
 

@@ -1,4 +1,4 @@
-"""Protokoll der Rollladensteuerung: alle Aktionen der letzten 14 Tage (JSON-Zeilen in .storage)."""
+"""Protokoll der Rollladensteuerung: alle Aktionen der letzten 90 Tage (JSON-Zeilen in .storage)."""
 from __future__ import annotations
 
 import asyncio
@@ -11,7 +11,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 
-AUFBEWAHRUNG_TAGE = 14
+AUFBEWAHRUNG_TAGE = 90
 
 
 class Protokoll:
@@ -54,14 +54,23 @@ class Protokoll:
                 continue
         return eintraege
 
-    async def lesen(self, tage: int = AUFBEWAHRUNG_TAGE) -> list[dict]:
+    async def lesen(self, tage: int = AUFBEWAHRUNG_TAGE, von: datetime | None = None,
+                    bis: datetime | None = None) -> list[dict]:
+        """Einträge eines Zeitraums (von/bis mit Zeitzone); ohne von: die letzten `tage` Tage."""
         await self._schreiben()
-        grenze = (dt_util.now() - timedelta(days=tage)).isoformat(timespec="seconds")
+        if von is None:
+            von = dt_util.now() - timedelta(days=tage)
         eintraege = await self.hass.async_add_executor_job(self._laden)
-        return [e for e in eintraege if e.get("zeit", "") >= grenze]
+        aus = []
+        for e in eintraege:
+            zeit = self.als_zeit(e.get("zeit", ""))
+            if zeit is None or zeit.tzinfo is None or zeit < von or (bis is not None and zeit > bis):
+                continue
+            aus.append(e)
+        return aus
 
     async def bereinigen(self) -> None:
-        """Einträge älter als 14 Tage entfernen (täglich nachts)."""
+        """Einträge älter als AUFBEWAHRUNG_TAGE entfernen (täglich nachts)."""
         async with self._sperre:
             grenze = (dt_util.now() - timedelta(days=AUFBEWAHRUNG_TAGE)).isoformat(timespec="seconds")
 

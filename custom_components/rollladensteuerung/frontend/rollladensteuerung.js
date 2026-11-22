@@ -9,7 +9,7 @@
  *    custom:rollladensteuerung (Rollläden eines Stockwerks), custom:rollladensteuerung-steuerung,
  *    custom:rollladensteuerung-meldungen
  */
-const VERSION = "0.7.8";
+const VERSION = "0.8.0";
 
 const TEXTE = {
   de: {
@@ -29,7 +29,14 @@ const TEXTE = {
     naechstes_schliessen: "Nächstes Schließen", keine_konfig: "Rollladensteuerung ist nicht eingerichtet.",
     nur_admin: "Nur Administratoren können Einstellungen ändern.", aus: "aus", auswaehlen: "Entität wählen oder tippen …", entfernen: "Entfernen", meldungen: "Benachrichtigungen & Protokoll",
     kein_push: "Kein Push-Dienst gewählt – Zahnrad der Rollladensteuerung → Allgemein → Push-Dienst.", push_ueber: "Push über",
-    protokoll: "Protokoll (14 Tage)", protokoll_anzeigen: "Protokoll anzeigen", protokoll_speichern: "Protokoll speichern",
+    protokoll: "Protokoll", protokoll_anzeigen: "Protokoll anzeigen", protokoll_speichern: "Protokoll speichern",
+    p_heute: "Heute", p_gestern: "Gestern", p_7t: "7 Tage", p_30t: "30 Tage", p_alles: "Alles", p_von: "Von", p_bis: "Bis",
+    p_anzeigen: "Anzeigen", p_ausblenden: "Ausblenden", p_herunterladen: "Herunterladen (CSV)", p_rolllaeden: "Rollläden",
+    p_arten: "Ereignisse", p_alle: "Alle", p_leer: "Keine Einträge für diese Auswahl.", p_zeitraum_fehlt: "Bitte Von und Bis angeben.",
+    p_mehr: "Angezeigt werden die neuesten 2000 Einträge – die CSV-Datei enthält alle.", datum: "Datum", uhrzeit: "Uhrzeit",
+    f_zeitraum: "Zeitraum beim Öffnen", f_rolllaeden: "Nur diese Rollläden (leer = alle)", f_arten: "Nur diese Ereignisse (leer = alle)",
+    f_anzeigen: "Einträge sofort anzeigen", f_filter: "Filter auf der Karte anzeigen",
+    v_protokoll: "Rollladensteuerung – Protokoll", v_protokoll_text: "Protokoll mit Zeitraum, Filtern und CSV-Download",
     alle_rolllaeden: "Alle Rollläden", alle_arten: "Alle Arten", suchen: "Suchen …", zeit: "Zeit", rollladen: "Rollladen",
     art: "Art", meldung: "Meldung", eintraege: "Einträge",
     f_stockwerk: "Stockwerk", f_titel: "Überschrift (leer = automatisch)", f_verlauf: "Helligkeitsverlauf anzeigen", sonne_titel: "Sonne", sonne_hoehe: "Höhe", sonne_steigt: "steigt", sonne_sinkt: "sinkt", sonne_unter: "unter dem Horizont", sonne_stand: "Stand",
@@ -58,7 +65,14 @@ const TEXTE = {
     naechstes_schliessen: "Next closing", keine_konfig: "Shutter control is not set up.",
     nur_admin: "Only administrators can change settings.", aus: "off", auswaehlen: "Pick or type an entity …", entfernen: "Remove", meldungen: "Notifications & log",
     kein_push: "No push service selected – gear of the shutter control → General → push service.", push_ueber: "Push via",
-    protokoll: "Log (14 days)", protokoll_anzeigen: "Show log", protokoll_speichern: "Save log",
+    protokoll: "Log", protokoll_anzeigen: "Show log", protokoll_speichern: "Save log",
+    p_heute: "Today", p_gestern: "Yesterday", p_7t: "7 days", p_30t: "30 days", p_alles: "All", p_von: "From", p_bis: "To",
+    p_anzeigen: "Show", p_ausblenden: "Hide", p_herunterladen: "Download (CSV)", p_rolllaeden: "Shutters",
+    p_arten: "Events", p_alle: "All", p_leer: "No entries for this selection.", p_zeitraum_fehlt: "Please enter from and to.",
+    p_mehr: "Showing the newest 2000 entries – the CSV file contains all of them.", datum: "Date", uhrzeit: "Time",
+    f_zeitraum: "Period when opened", f_rolllaeden: "Only these shutters (empty = all)", f_arten: "Only these events (empty = all)",
+    f_anzeigen: "Show entries right away", f_filter: "Show filters on the card",
+    v_protokoll: "Shutter control – log", v_protokoll_text: "Log with period, filters and CSV download",
     alle_rolllaeden: "All shutters", alle_arten: "All types", suchen: "Search …", zeit: "Time", rollladen: "Shutter",
     art: "Type", meldung: "Message", eintraege: "entries",
     f_stockwerk: "Floor", f_titel: "Heading (empty = automatic)", f_verlauf: "Show brightness history", sonne_titel: "Sun", sonne_hoehe: "elevation", sonne_steigt: "rising", sonne_sinkt: "setting", sonne_unter: "below the horizon", sonne_stand: "as of",
@@ -760,16 +774,29 @@ const ARTEN = {
 };
 const artText = (hass, art) => ((ARTEN[(hass?.language || "en").split("-")[0]] || ARTEN.en)[art] || art);
 
-async function protokollLaden(hass, tage = 14) {
-  return (await hass.callWS({ type: "rollladensteuerung/protokoll", tage })).eintraege || [];
+async function protokollLaden(hass, tage = 90, von, bis) {
+  const msg = { type: "rollladensteuerung/protokoll", tage };
+  if (von) msg.von = von.toISOString();
+  if (bis) msg.bis = bis.toISOString();
+  return (await hass.callWS(msg)).eintraege || [];
 }
 
-async function protokollSpeichern(hass, eintraege) {
-  const kopf = "Zeit;Rollladen;Art;Meldung";
-  const zeilen = eintraege.map((e) => [e.zeit, e.rollladen, artText(hass, e.art), e.text]
-    .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";"));
-  const inhalt = "﻿" + [kopf, ...zeilen].join("\r\n");
-  const name = `rollladensteuerung-protokoll-${new Date().toISOString().slice(0, 10)}.csv`;
+const zweistellig = (n) => String(n).padStart(2, "0");
+const isoTag = (d) => `${d.getFullYear()}-${zweistellig(d.getMonth() + 1)}-${zweistellig(d.getDate())}`;
+
+async function protokollSpeichern(hass, eintraege, von, bis) {
+  // Semikolon + BOM: öffnet sich in Excel/Numbers direkt richtig; Datum und Uhrzeit in eigenen Spalten
+  const kopf = [tx(hass, "datum"), tx(hass, "uhrzeit"), tx(hass, "rollladen"), tx(hass, "art"), tx(hass, "meldung")].join(";");
+  const zeilen = eintraege.map((e) => {
+    const d = new Date(e.zeit);
+    const datum = isNaN(d) ? e.zeit : `${zweistellig(d.getDate())}.${zweistellig(d.getMonth() + 1)}.${d.getFullYear()}`;
+    const uhr = isNaN(d) ? "" : `${zweistellig(d.getHours())}:${zweistellig(d.getMinutes())}:${zweistellig(d.getSeconds())}`;
+    return [datum, uhr, e.rollladen, artText(hass, e.art), e.text]
+      .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";");
+  });
+  const inhalt = "\ufeff" + [kopf, ...zeilen].join("\r\n");
+  const bereich = von && bis ? (isoTag(von) === isoTag(bis) ? isoTag(von) : `${isoTag(von)}_bis_${isoTag(bis)}`) : isoTag(new Date());
+  const name = `rollladensteuerung-protokoll-${bereich}.csv`;
   const datei = new File([inhalt], name, { type: "text/csv" });
   // Auf Handy/Tablet (App) über „Teilen“ speichern, sonst als Download
   if (navigator.canShare && navigator.canShare({ files: [datei] })) {
@@ -959,6 +986,225 @@ class ProtokollDialog extends HTMLElement {
   }
 }
 
+/* ---------------------------------------------------------------- Protokoll-Karte (eigenständig nutzbar) */
+const ZEITRAEUME = ["heute", "gestern", "7t", "30t", "alles"];
+const ALS_EINGABE = (d) => `${isoTag(d)}T${zweistellig(d.getHours())}:${zweistellig(d.getMinutes())}`;
+
+function zeitraumVon(s) {
+  const jetzt = new Date();
+  const mitternacht = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
+  if (s === "gestern") return [new Date(mitternacht - 86400e3), new Date(mitternacht - 60e3)];
+  if (s === "7t") return [new Date(jetzt - 7 * 86400e3), jetzt];
+  if (s === "30t") return [new Date(jetzt - 30 * 86400e3), jetzt];
+  if (s === "alles") return [new Date(jetzt - 90 * 86400e3), jetzt];
+  return [mitternacht, jetzt];
+}
+
+class ProtokollKarte extends HTMLElement {
+  static getConfigElement() { return document.createElement("rollladensteuerung-protokoll-editor"); }
+  static getStubConfig() { return { zeitraum: "heute" }; }
+  setConfig(config) {
+    this._config = { zeitraum: "heute", filter: true, ...(config || {}) };
+    this._rl = new Set(this._config.rolllaeden || []);
+    this._arten = new Set(this._config.arten || []);
+    if (this.shadowRoot) { this._schnell(this._config.zeitraum, false); this._filterBauen(); }
+  }
+  getCardSize() { return this._offen ? 10 : 5; }
+  getGridOptions() { return { columns: 12, min_columns: 6, rows: "auto" }; }
+
+  set hass(hass) {
+    const erstes = !this._hass;
+    this._hass = hass;
+    if (!this.shadowRoot) this._aufbauen();
+    if (erstes) {
+      ladeKonfig(hass).then((k) => { this._namen = ["Zentrale", ...k.rolllaeden.map((r) => r.name).sort()]; this._filterBauen(); })
+        .catch(() => {});
+      if (this._config.anzeigen) this._anzeigen(true);
+    }
+  }
+
+  _aufbauen() {
+    const h = this._hass;
+    const root = this.attachShadow({ mode: "open" });
+    root.innerHTML = `
+      <style>${GEMEINSAM_CSS}
+        .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        .chips .etikett { font-size: 12px; color: var(--secondary-text-color); margin-right: 2px; min-width: 70px; }
+        .chip { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 16px; cursor: pointer;
+          border: 1px solid var(--divider-color); background: none; color: var(--primary-text-color); }
+        .chip.an { background: rgba(var(--rgb-primary-color, 3,169,244), 0.18); border-color: var(--primary-color); color: var(--primary-color); }
+        .leiste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; color: var(--secondary-text-color); }
+        .leiste label { display: flex; align-items: center; gap: 6px; }
+        .leiste input { font: inherit; font-size: 13px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--divider-color);
+          background: var(--card-background-color, transparent); color: var(--primary-text-color); color-scheme: light dark; }
+        .leiste input.suche { flex: 1; min-width: 120px; }
+        .tasten button.haupt { background: var(--primary-color); color: var(--text-primary-color, #fff); }
+        /* breite Tabellen dürfen die Karte nicht aufweiten (Flex-Kinder haben sonst min-width: auto) */
+        ha-card > * { min-width: 0; }
+        .tabelle { max-height: 460px; overflow: auto; border-top: 1px solid var(--divider-color); }
+        td.text { overflow-wrap: anywhere; }
+        @media (max-width: 500px) { .leiste label { flex: 1 1 100%; } .leiste label input { flex: 1; min-width: 0; } }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { text-align: left; position: sticky; top: 0; background: var(--ha-card-background, var(--card-background-color, #fff));
+          padding: 6px 8px 6px 0; border-bottom: 1px solid var(--divider-color); color: var(--secondary-text-color); font-weight: 500; }
+        td { padding: 5px 8px 5px 0; border-bottom: 1px solid var(--divider-color); vertical-align: top; }
+        td.zeit { white-space: nowrap; color: var(--secondary-text-color); }
+        tr.warnung td { color: var(--error-color, #c62828); }
+        .info { font-size: 13px; color: var(--secondary-text-color); }
+        [hidden] { display: none !important; }
+      </style>
+      <ha-card>
+        <div class="kopf">
+          <div class="symbol" style="--rgb-farbe: var(--rgb-primary-color, 3,169,244)"><ha-icon icon="mdi:text-box-search-outline"></ha-icon></div>
+          <div class="text"><div class="name"></div><div class="zustand"></div></div>
+        </div>
+        <div class="chips zeitraum">${ZEITRAEUME.map((z) => `<button class="chip" data-z="${z}">${tx(h, `p_${z}`)}</button>`).join("")}</div>
+        <div class="leiste">
+          <label>${tx(h, "p_von")} <input type="datetime-local" class="von"></label>
+          <label>${tx(h, "p_bis")} <input type="datetime-local" class="bis"></label>
+        </div>
+        <div class="filter">
+          <div class="chips rl"></div>
+          <div class="chips art" style="margin-top:6px"></div>
+          <div class="leiste" style="margin-top:6px"><input class="suche" placeholder="${tx(h, "suchen")}"></div>
+        </div>
+        <div class="tasten">
+          <button class="anzeigen"><ha-icon icon="mdi:table-eye"></ha-icon>&nbsp;<span>${tx(h, "p_anzeigen")}</span></button>
+          <button class="haupt laden"><ha-icon icon="mdi:download"></ha-icon>&nbsp;${tx(h, "p_herunterladen")}</button>
+        </div>
+        <div class="info"></div>
+        <div class="tabelle" hidden></div>
+      </ha-card>`;
+    const $ = (s) => root.querySelector(s);
+    root.querySelectorAll(".zeitraum .chip").forEach((b) => b.addEventListener("click", () => this._schnell(b.dataset.z, true)));
+    [".von", ".bis"].forEach((s) => $(s).addEventListener("change", () => {
+      this._wahl = ""; this._chipsZeitraum(); this._eintraege = null; if (this._offen) this._anzeigen(true);
+    }));
+    $(".suche").addEventListener("input", () => this._zeigen());
+    $(".anzeigen").addEventListener("click", () => this._anzeigen(!this._offen));
+    $(".laden").addEventListener("click", () => this._herunterladen());
+    this._schnell(this._config.zeitraum, false);
+    this._filterBauen();
+  }
+
+  _schnell(z, neuLaden) {
+    const [von, bis] = zeitraumVon(z);
+    this._wahl = z;
+    this.shadowRoot.querySelector(".von").value = ALS_EINGABE(von);
+    this.shadowRoot.querySelector(".bis").value = ALS_EINGABE(bis);
+    this._chipsZeitraum();
+    this._eintraege = null;
+    if (neuLaden && this._offen) this._anzeigen(true);
+  }
+  _chipsZeitraum() {
+    this.shadowRoot.querySelectorAll(".zeitraum .chip").forEach((b) => b.classList.toggle("an", b.dataset.z === this._wahl));
+  }
+
+  _zeitraum() {
+    const r = this.shadowRoot;
+    // „bis jetzt“-Zeiträume beim Laden aktualisieren, damit neue Einträge dazukommen
+    if (this._wahl && this._wahl !== "gestern") return zeitraumVon(this._wahl);
+    const von = new Date(r.querySelector(".von").value), bis = new Date(r.querySelector(".bis").value);
+    if (isNaN(von) || isNaN(bis)) return null;
+    bis.setSeconds(59, 999);
+    return [von, bis];
+  }
+
+  _filterBauen() {
+    const r = this.shadowRoot;
+    if (!r || !this._hass) return;
+    const h = this._hass;
+    r.querySelector(".filter").hidden = this._config.filter === false;
+    const bauen = (ziel, etikett, werte, menge, text) => {
+      ziel.innerHTML = `<span class="etikett">${esc(etikett)}</span>`;
+      const alle = document.createElement("button");
+      alle.className = "chip" + (menge.size ? "" : " an");
+      alle.textContent = tx(h, "p_alle");
+      alle.addEventListener("click", () => { menge.clear(); this._filterBauen(); this._zeigen(); });
+      ziel.appendChild(alle);
+      for (const w of werte) {
+        const b = document.createElement("button");
+        b.className = "chip" + (menge.has(w) ? " an" : "");
+        b.textContent = text(w);
+        b.addEventListener("click", () => { menge.has(w) ? menge.delete(w) : menge.add(w); this._filterBauen(); this._zeigen(); });
+        ziel.appendChild(b);
+      }
+    };
+    const namen = [...new Set([...(this._namen || []), ...this._rl])];
+    bauen(r.querySelector(".rl"), tx(h, "p_rolllaeden"), namen, this._rl, (w) => w);
+    bauen(r.querySelector(".art"), tx(h, "p_arten"), Object.keys(ARTEN.de), this._arten, (w) => artText(h, w));
+    r.querySelector(".name").textContent = this._config.titel || tx(h, "protokoll");
+  }
+
+  async _holen() {
+    const z = this._zeitraum();
+    const info = this.shadowRoot.querySelector(".info");
+    if (!z) { info.textContent = tx(this._hass, "p_zeitraum_fehlt"); return null; }
+    if (!this._eintraege || this._wahl) {
+      info.textContent = tx(this._hass, "laedt");
+      this._eintraege = await protokollLaden(this._hass, 90, z[0], z[1]);
+      info.textContent = "";
+    }
+    return z;
+  }
+
+  _gefiltert() {
+    const suche = this.shadowRoot.querySelector(".suche").value.toLowerCase();
+    return (this._eintraege || []).filter((e) => (!this._rl.size || this._rl.has(e.rollladen))
+      && (!this._arten.size || this._arten.has(e.art))
+      && (!suche || `${e.rollladen} ${e.text}`.toLowerCase().includes(suche)));
+  }
+
+  async _anzeigen(offen) {
+    this._offen = offen;
+    const r = this.shadowRoot;
+    r.querySelector(".anzeigen span").textContent = tx(this._hass, offen ? "p_ausblenden" : "p_anzeigen");
+    r.querySelector(".tabelle").hidden = !offen;
+    if (!offen) { r.querySelector(".info").textContent = ""; return; }
+    try { await this._holen(); this._zeigen(); }
+    catch (e) { r.querySelector(".info").textContent = `${tx(this._hass, "fehler")}: ${e?.message || e}`; }
+  }
+
+  async _herunterladen() {
+    try {
+      const z = await this._holen();
+      if (!z) return;
+      await protokollSpeichern(this._hass, this._gefiltert(), z[0], z[1]);
+      if (this._offen) this._zeigen();
+    } catch (e) { this.shadowRoot.querySelector(".info").textContent = `${tx(this._hass, "fehler")}: ${e?.message || e}`; }
+  }
+
+  _zeigen() {
+    const r = this.shadowRoot, h = this._hass;
+    const liste = this._gefiltert();
+    r.querySelector(".zustand").textContent = this._eintraege ? `${liste.length} ${tx(h, "eintraege")}` : "";
+    if (!this._offen || !this._eintraege) return;
+    const ziel = r.querySelector(".tabelle");
+    if (!liste.length) { ziel.innerHTML = `<div class="info" style="padding:12px 0">${esc(tx(h, "p_leer"))}</div>`; return; }
+    const sprache = h?.locale?.language || h?.language || "de";
+    const tabelle = document.createElement("table");
+    tabelle.innerHTML = `<thead><tr><th>${tx(h, "zeit")}</th><th>${tx(h, "rollladen")}</th><th>${tx(h, "art")}</th><th>${tx(h, "meldung")}</th></tr></thead>`;
+    const body = document.createElement("tbody");
+    for (const e of liste.slice(0, 2000)) {
+      const tr = body.insertRow();
+      if (e.art === "warnung") tr.className = "warnung";
+      const d = new Date(e.zeit);
+      const zelle = tr.insertCell(); zelle.className = "zeit";
+      zelle.textContent = isNaN(d) ? e.zeit : d.toLocaleString(sprache, { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+      tr.insertCell().textContent = e.rollladen;
+      tr.insertCell().textContent = artText(h, e.art);
+      const t = tr.insertCell(); t.className = "text"; t.textContent = e.text;
+    }
+    tabelle.appendChild(body);
+    ziel.innerHTML = "";
+    ziel.appendChild(tabelle);
+    if (liste.length > 2000) {
+      const mehr = document.createElement("div"); mehr.className = "info"; mehr.style.padding = "8px 0";
+      mehr.textContent = tx(h, "p_mehr"); ziel.appendChild(mehr);
+    }
+  }
+}
+
 /* ---------------------------------------------------------------- Vorlagen (strategies) */
 function gruppieren(hass, rolllaeden) {
   const gruppen = new Map();
@@ -997,6 +1243,11 @@ function meldungenKarten(hass, config) {
     { type: "custom:rollladensteuerung-meldungen-card", grid_options: { columns: "full" } },
   ];
 }
+function protokollKarten(hass, config) {
+  const karte = { type: "custom:rollladensteuerung-protokoll-card", grid_options: { columns: "full" } };
+  for (const k of ["zeitraum", "rolllaeden", "arten", "anzeigen", "filter"]) if (config[k] !== undefined) karte[k] = config[k];
+  return [{ type: "heading", heading: config.titel || tx(hass, "protokoll"), icon: "mdi:text-box-search-outline" }, karte];
+}
 function rollladenKarten(g, titel) {
   const liste = [...g.liste].sort((a, b) => a.name.localeCompare(b.name));
   return [
@@ -1015,8 +1266,11 @@ async function ansichtBauen(config, hass) {
   const steuerung = { type: "grid", cards: [...steuerungKarten(k, hass, { verlauf: config.verlauf }), ...meldungenKarten(hass, {})] };
   const sections = gruppieren(hass, k.rolllaeden).map((g) => ({ type: "grid", cards: rollladenKarten(g) }));
   if (config.steuerung === "vorne") sections.unshift(steuerung); else sections.push(steuerung);
+  const spalten = config.max_columns || 4;
+  // Protokoll als eigene Gruppe unter allen anderen (volle Breite); protokoll: false blendet sie aus
+  if (config.protokoll !== false) sections.push({ type: "grid", column_span: spalten, cards: protokollKarten(hass, {}) });
   return { title: config.title || tx(hass, "rolllaeden"), path: config.path, icon: config.icon,
-    type: "sections", max_columns: config.max_columns || 4, sections };
+    type: "sections", max_columns: spalten, sections };
 }
 
 /* ---------------------------------------------------------------- Abschnitts-Vorlagen (section strategies) */
@@ -1063,6 +1317,13 @@ class AbschnittMeldungen extends HTMLElement {
   static getConfigElement() { return document.createElement("rollladensteuerung-meldungen-editor"); }
   static getStubConfig() { return { type: "custom:rollladensteuerung-meldungen" }; }
   static async generate(config, hass) { return { type: "grid", cards: meldungenKarten(hass, config) }; }
+}
+
+class AbschnittProtokoll extends HTMLElement {
+  static getConfigElement() { return document.createElement("rollladensteuerung-protokoll-editor"); }
+  static getStubConfig() { return { type: "custom:rollladensteuerung-protokoll" }; }
+  // volle Breite (wird auf die Spaltenzahl der Ansicht begrenzt) → steht als eigene Gruppe unter den anderen
+  static async generate(config, hass) { return { type: "grid", column_span: 4, cards: protokollKarten(hass, config) }; }
 }
 
 function stockwerkVon(hass, r) {
@@ -1118,6 +1379,28 @@ class SteuerungEditor extends AbschnittEditor {
   _daten() { return { verlauf: true, ...this._config }; }
 }
 
+class ProtokollEditor extends AbschnittEditor {
+  async _zeichnen() {
+    if (this._hass && !this._namen) {
+      this._namen = [];
+      try { this._namen = ["Zentrale", ...(await ladeKonfig(this._hass)).rolllaeden.map((r) => r.name).sort()]; } catch (e) { /* leer */ }
+    }
+    return super._zeichnen();
+  }
+  schema() {
+    const h = this._hass;
+    return [
+      ...super.schema(),
+      { name: "zeitraum", selector: { select: { mode: "dropdown", options: ZEITRAEUME.map((z) => ({ value: z, label: tx(h, `p_${z}`) })) } } },
+      { name: "rolllaeden", selector: { select: { multiple: true, options: (this._namen || []).map((n) => ({ value: n, label: n })) } } },
+      { name: "arten", selector: { select: { multiple: true, options: Object.keys(ARTEN.de).map((a) => ({ value: a, label: artText(h, a) })) } } },
+      { name: "filter", selector: { boolean: {} } },
+      { name: "anzeigen", selector: { boolean: {} } },
+    ];
+  }
+  _daten() { return { zeitraum: "heute", filter: true, anzeigen: false, ...this._config }; }
+}
+
 class AnsichtVorlage extends HTMLElement {
   static async generate(config, hass) { return ansichtBauen(config, hass); }
 }
@@ -1136,6 +1419,9 @@ definieren("rollladensteuerung-dialog", EinstellDialog);
 definieren("rollladensteuerung-meldungen-card", MeldungenKarte);
 definieren("rollladensteuerung-sonne-card", SonneKarte);
 definieren("rollladensteuerung-protokoll", ProtokollDialog);
+definieren("rollladensteuerung-protokoll-card", ProtokollKarte);
+definieren("ll-strategy-section-rollladensteuerung-protokoll", AbschnittProtokoll);
+definieren("rollladensteuerung-protokoll-editor", ProtokollEditor);
 definieren("ll-strategy-view-rollladensteuerung", AnsichtVorlage);
 definieren("ll-strategy-dashboard-rollladensteuerung", DashboardVorlage);
 definieren("ll-strategy-section-rollladensteuerung", AbschnittRolllaeden);
@@ -1155,6 +1441,7 @@ definieren("rollladensteuerung-meldungen-editor", AbschnittEditor);
     ["rollladensteuerung", "section", t("v_rolllaeden"), t("v_rolllaeden_text")],
     ["rollladensteuerung-steuerung", "section", t("v_steuerung"), t("v_steuerung_text")],
     ["rollladensteuerung-meldungen", "section", t("v_meldungen"), t("v_meldungen_text")],
+    ["rollladensteuerung-protokoll", "section", t("v_protokoll"), t("v_protokoll_text")],
     ["rollladensteuerung", "dashboard", t("zentrale"), t("v_dashboard_text")],
   ]) {
     if (!window.customStrategies.some((s) => s.type === type && s.strategyType === strategyType)) {
@@ -1166,7 +1453,8 @@ definieren("rollladensteuerung-meldungen-editor", AbschnittEditor);
 window.customCards = window.customCards || [];
 window.customCards.push(
   { type: "rollladensteuerung-card", name: "Rollladen (Rollladensteuerung)", description: "Rollladen mit Automatik-Status und Einstellungen", preview: false },
-  { type: "rollladensteuerung-meldungen-card", name: "Rollladensteuerung – Benachrichtigungen & Protokoll", description: "Push-Schalter und Protokoll der letzten 14 Tage", preview: false },
+  { type: "rollladensteuerung-meldungen-card", name: "Rollladensteuerung – Benachrichtigungen & Protokoll", description: "Push-Schalter und Protokoll", preview: false },
+  { type: "rollladensteuerung-protokoll-card", name: "Rollladensteuerung – Protokoll", description: "Protokoll mit Zeitraum, Filtern und CSV-Download", preview: false },
   { type: "rollladensteuerung-zentrale-card", name: "Rollladensteuerung – Zentrale", description: "Globale Schalter und Einstellungen", preview: false },
 );
 console.info(`%c ROLLLADENSTEUERUNG %c ${VERSION} `, "background:#926bc7;color:#fff", "background:#ddd;color:#000");

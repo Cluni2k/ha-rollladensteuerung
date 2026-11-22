@@ -55,8 +55,10 @@ Alles wird in der Oberfläche eingestellt, ein passendes Dashboard ist dabei.
   **Warnhinweise** (wegen Frost nicht geöffnet, Fenster beim Schließen offen, Aussperrschutz, Sensor oder Rollladen
   15 Minuten nicht erreichbar, Zielposition nicht erreicht), **Lüften**, **Abschatten** (Anfang und Ende),
   **Funktionen** (Automatik ein/aus) und **manuelle Fahrten**.
-- **Protokoll der letzten 14 Tage** mit allen Aktionen – automatische und manuelle Fahrten, ausgelassene Fahrten mit Grund,
-  geschaltete Funktionen, Warnungen – im Dashboard ansehen, filtern und als CSV speichern.
+- **Protokoll der letzten 90 Tage** mit allen Aktionen – automatische und manuelle Fahrten, ausgelassene Fahrten mit Grund,
+  geschaltete Funktionen, Warnungen. Die Protokoll-Karte bietet Zeitraum (Heute, Gestern, 7/30 Tage, Alles oder Von–Bis),
+  Filter nach Rollläden und Ereignissen, Anzeige der Einträge und Download als CSV (Semikolon, öffnet sich direkt in
+  Excel/Numbers). Frost: eine Push-Meldung für alle Rollläden, die zu bleiben – nicht eine je Rollladen.
 
 **Allgemein**
 - **Gestaffelte Fahrten** mit einstellbarem Abstand (schont z. B. den Homematic-Duty-Cycle) – auch bei
@@ -134,19 +136,30 @@ entity: cover.wohnzimmer
 ```yaml
 type: custom:rollladensteuerung-zentrale-card
 ```
+```yaml
+type: custom:rollladensteuerung-protokoll-card
+zeitraum: 7t            # heute, gestern, 7t, 30t, alles
+rolllaeden: [Bad, Büro] # optional voreingestellter Filter (Namen); leer = alle
+arten: [warnung]        # optional: oeffnen, schliessen, lueften, abschatten, warnung, manuell, fahrt, info, funktion
+anzeigen: true          # Einträge sofort anzeigen
+filter: true            # Filter auf der Karte anzeigen
+```
+Die Protokoll-Karte lässt sich auf jedem Dashboard verwenden; alle Optionen gibt es auch im visuellen Karten-Editor.
+Die erzeugte Ansicht zeigt sie als eigene Gruppe in voller Breite unter allen anderen (`protokoll: false` blendet sie aus).
 
 Das Zahnrad auf einer Rollladen-Karte öffnet einen Dialog mit den Karteikarten *Status, Grundlagen, Zeiten,
 Positionen, Fenster, Abschattung*. Das Zahnrad der Zentrale öffnet die Haupteinstellungen. Ändern dürfen
 nur Administratoren.
 
 **Selbst anordnen (empfohlen, ab HA 2026.11): automatische Abschnitte.** In einer normalen Abschnitts-Ansicht
-*Abschnitt hinzufügen → Automatischer Abschnitt → Community* wählen. Es gibt drei Abschnitte:
+*Abschnitt hinzufügen → Automatischer Abschnitt → Community* wählen. Es gibt vier Abschnitte:
 
 | Abschnitt | Inhalt | Einstellungen |
 |---|---|---|
 | *Rollläden (Rollladensteuerung)* | alle Rollläden eines Stockwerks, nach Namen sortiert | Stockwerk (oder *Alle Rollläden* / *ohne Stockwerk*), Überschrift |
 | *Rollladensteuerung – Automatik* | Zentrale mit Schaltern, Alle-Buttons und Zahnrad, Helligkeitsverlauf mit aktuellem Sonnenstand (Richtung und Höhe) | Überschrift, Helligkeitsverlauf an/aus |
 | *Rollladensteuerung – Benachrichtigungen* | Push-Schalter und Protokoll | Überschrift |
+| *Rollladensteuerung – Protokoll* | Protokoll mit Zeitraum, Filtern, Anzeige und CSV-Download | Überschrift, Zeitraum, Rollläden, Ereignisse, Filter, sofort anzeigen |
 
 Die Abschnitte lassen sich frei verschieben und mit eigenen Karten mischen; die Anordnung liegt im eigenen Dashboard
 und übersteht Updates. Neue Rollläden erscheinen trotzdem automatisch im Abschnitt ihres Stockwerks (Stockwerk über den
@@ -162,6 +175,8 @@ sections:
       type: custom:rollladensteuerung-steuerung
   - strategy:
       type: custom:rollladensteuerung-meldungen
+  - strategy:
+      type: custom:rollladensteuerung-protokoll
 ```
 
 Die Ansicht aus der Dashboard-Vorlage oben wird dagegen erzeugt und ist schreibgeschützt.

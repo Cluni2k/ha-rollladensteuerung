@@ -58,8 +58,10 @@ integration – configured entirely in the UI, with its own dashboard.
   **warnings** (not opened because of frost, window still open at closing time, lock-out protection, a sensor or shutter
   unreachable for 15 minutes, a shutter that did not reach its target position), **ventilation**, **shading** (start and end),
   **functions** (automation switched on/off) and **manual moves**.
-- A **log of the last 14 days** with all actions – automatic and manual moves, skipped moves and why, switched functions,
-  warnings – viewable and filterable on the dashboard and downloadable as CSV.
+- A **log of the last 90 days** with all actions – automatic and manual moves, skipped moves and why, switched functions,
+  warnings. The log card lets you pick a period (today, yesterday, 7/30 days, everything or from–to), filter by shutters
+  and event types, show the entries or download them as CSV (semicolon-separated, opens directly in Excel/Numbers).
+  Frost: one push for all shutters that stay closed, not one per shutter.
 
 **General**
 - **Staggered commands** with an adjustable delay (protects e.g. the Homematic duty cycle) – also for
@@ -134,19 +136,30 @@ entity: cover.living_room
 ```yaml
 type: custom:rollladensteuerung-zentrale-card
 ```
+```yaml
+type: custom:rollladensteuerung-protokoll-card
+zeitraum: 7t            # heute, gestern, 7t, 30t, alles
+rolllaeden: [Bad, Büro] # optional preset filter (names); empty = all
+arten: [warnung]        # optional: oeffnen, schliessen, lueften, abschatten, warnung, manuell, fahrt, info, funktion
+anzeigen: true          # show the entries right away
+filter: true            # show the filter chips on the card
+```
+The log card can be placed on any dashboard; all options are also in the visual card editor.
+The generated view shows it as its own full-width group below all others (`protokoll: false` hides it).
 
 The gear on a shutter card opens a dialog with the tabs *Status, Basics, Times, Positions, Window,
 Sun protection*. The gear on the central card opens the global settings. Changing settings requires an
 administrator account.
 
 **Arranging it yourself (recommended, HA 2026.11+): automatic sections.** In a normal sections view choose
-*Add section → Automatic section → Community*. There are three sections:
+*Add section → Automatic section → Community*. There are four sections:
 
 | Section | Content | Settings |
 |---|---|---|
 | *Shutters (Rollladensteuerung)* | all shutters of one floor, sorted by name | floor (or *All shutters* / *without floor*), heading |
 | *Shutter control – automation* | central card with switches, all buttons and gear, brightness history with the current sun position (direction and elevation) | heading, brightness history on/off |
 | *Shutter control – notifications* | push switches and log | heading |
+| *Shutter control – log* | log with period, filters, display and CSV download | heading, period, shutters, events, filters, show right away |
 
 Move the sections around freely and mix them with your own cards; the layout is stored in your dashboard and survives
 updates. New shutters still appear automatically in the section of their floor (floor of the shutter's area or its
@@ -161,6 +174,8 @@ sections:
       type: custom:rollladensteuerung-steuerung
   - strategy:
       type: custom:rollladensteuerung-meldungen
+  - strategy:
+      type: custom:rollladensteuerung-protokoll
 ```
 
 The view built by the dashboard strategy above, on the other hand, is generated and read-only.
