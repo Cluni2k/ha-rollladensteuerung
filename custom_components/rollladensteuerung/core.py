@@ -126,6 +126,8 @@ class Zustand:
     oeffnen_nachholen: bool = False             # morgens nicht geöffnet, weil jemand schlief
     abschattung_ziel: int = -1                  # aktuell angefahrene Abschattungsposition
     fenster_stand: str | None = None            # zuletzt verarbeiteter Gesamtzustand aller Kontakte
+    hoch_erledigt: str = ""                     # Tag (ISO), an dem das Öffnen schon ausgelöst wurde
+    runter_erledigt: str = ""                   # Tag (ISO), an dem das Schließen schon ausgelöst wurde
 
     def speichern(self) -> dict:
         daten = asdict(self)
@@ -205,6 +207,19 @@ FROST_TEXT = "Öffnen: Frostschutz"
 def frost_haelt_zurueck(e: "Einstellungen", u: "Umgebung") -> bool:
     """Bleibt dieser Rollladen morgens wegen Frost geschlossen?"""
     return e.frostschutz and u.temperatur is not None and u.temperatur <= u.frost_temp
+
+
+def erster_termin(jetzt: datetime, kandidaten: list[datetime], erledigt: str = "") -> datetime | None:
+    """Erste Zeit, die noch kommt und nicht an einem Tag liegt, an dem schon ausgelöst wurde.
+
+    Die Zufallsminuten werden bei jedem Planen neu gewürfelt – ohne den Merker „erledigt“ würde nach dem
+    Auslösen für denselben Tag erneut eine Zeit im Zufallsfenster geplant (Öffnen/Schließen doppelt)."""
+    for t in kandidaten:
+        if erledigt and t.date().isoformat() <= erledigt:
+            continue
+        if t > jetzt + timedelta(minutes=1):
+            return t
+    return None
 
 
 def kategorie(grund: str) -> str:

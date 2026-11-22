@@ -441,3 +441,22 @@ def test_frost_haelt_zurueck_nur_mit_frostschutz():
     r.oeffnen(kalt, core.Lage(0))
     assert r.abholen()[0][1].startswith(core.FROST_TEXT)                    # daran erkennt der Controller die Meldung
     assert rl(frostschutz=False, offen_pos=100).oeffnen(kalt, core.Lage(0))[0].position == 100
+
+
+def test_erster_termin_nicht_zweimal_am_selben_tag():
+    jetzt = datetime(2026, 11, 22, 9, 36, tzinfo=TZ)              # Öffnen gerade ausgelöst (Fenster 09:30–09:40)
+    heute_neu_gewuerfelt = datetime(2026, 11, 22, 9, 39, tzinfo=TZ)
+    morgen = datetime(2026, 11, 23, 7, 50, tzinfo=TZ)
+    # ohne Merker würde die neu gewürfelte Zeit von heute noch einmal auslösen (Fehler bis 0.8.0)
+    assert core.erster_termin(jetzt, [heute_neu_gewuerfelt, morgen]) == heute_neu_gewuerfelt
+    assert core.erster_termin(jetzt, [heute_neu_gewuerfelt, morgen], "2026-11-22") == morgen
+    # am nächsten Tag gilt der Merker von gestern nicht mehr
+    assert core.erster_termin(datetime(2026, 11, 23, 3, 5, tzinfo=TZ), [morgen], "2026-11-22") == morgen
+    # nicht in der nächsten Minute planen
+    assert core.erster_termin(jetzt, [jetzt + timedelta(seconds=30)]) is None
+
+
+def test_zustand_merker_erledigt_wird_gespeichert():
+    z = core.Zustand(hoch_erledigt="2026-11-22")
+    assert core.Zustand.laden(z.speichern()).hoch_erledigt == "2026-11-22"
+    assert core.Zustand.laden({}).runter_erledigt == ""

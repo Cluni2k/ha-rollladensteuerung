@@ -67,7 +67,7 @@ from .const import (
 )
 from . import entitaeten
 from .protokoll import Protokoll
-from .core import kontakt_geaendert, frost_haelt_zurueck, FROST_TEXT, ABSCHATTEN, LUEFTEN, MANUELL, OEFFNEN, SCHLIESSEN, WARNUNG, GEKIPPT, OFFEN, ZU, Einstellungen, Fahrt, Lage, Rollladen, Umgebung, Zustand, als_zeit
+from .core import kontakt_geaendert, erster_termin, frost_haelt_zurueck, FROST_TEXT, ABSCHATTEN, LUEFTEN, MANUELL, OEFFNEN, SCHLIESSEN, WARNUNG, GEKIPPT, OFFEN, ZU, Einstellungen, Fahrt, Lage, Rollladen, Umgebung, Zustand, als_zeit
 
 _LOGGER = logging.getLogger(__name__)
 PAUSE_RICHTUNGSWECHSEL = 1   # Sekunden zwischen Anhalten und Fahrt in die andere Richtung (schont den Motor)
@@ -631,13 +631,16 @@ class Steuerung:
                     and alt.date() <= jetzt.date() + timedelta(days=1):
                 neu[art] = alt
                 continue
+            erledigt = getattr(r.z, f"{art}_erledigt")
             for plus in (0, 1, 2):
                 tag = jetzt.date() + timedelta(days=plus)
+                if erledigt and tag.isoformat() <= erledigt:
+                    continue   # heute schon ausgelöst – nicht noch einmal im Zufallsfenster
                 hoch, runter = r.zeiten_berechnen(
                     tag, await self._werktag(tag), self._astro(tag, True), self._astro(tag, False), tz,
                     zufall_extra=int(self.cfg.get(CONF_URLAUB_ZUFALL, 30)) if self.schalter.get("urlaub") else 0)
-                t = hoch if art == "hoch" else runter
-                if t > jetzt + timedelta(minutes=1):
+                t = erster_termin(jetzt, [hoch if art == "hoch" else runter], erledigt)
+                if t is not None:
                     neu[art] = t
                     break
         r.z.hoch_zeit = neu.get("hoch")
@@ -664,6 +667,7 @@ class Steuerung:
                 _LOGGER.info("%s: %s", r.e.name, r.z.letzte_meldung)
             await self._ausfuehren(sid, fahrten)
             setattr(r.z, f"{art}_zeit", None)
+            setattr(r.z, f"{art}_erledigt", dt_util.now().date().isoformat())
             await self.async_zeiten_planen(sid)
         return _ausloesen
 
