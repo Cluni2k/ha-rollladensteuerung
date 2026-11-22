@@ -198,6 +198,15 @@ OEFFNEN, SCHLIESSEN, LUEFTEN, ABSCHATTEN, WARNUNG, MANUELL, FAHRT, INFO = (
     "oeffnen", "schliessen", "lueften", "abschatten", "warnung", "manuell", "fahrt", "info")
 
 
+# Meldungstext, wenn der Frostschutz das morgendliche Öffnen verhindert (Controller fasst diese Meldungen zusammen)
+FROST_TEXT = "Öffnen: Frostschutz"
+
+
+def frost_haelt_zurueck(e: "Einstellungen", u: "Umgebung") -> bool:
+    """Bleibt dieser Rollladen morgens wegen Frost geschlossen?"""
+    return e.frostschutz and u.temperatur is not None and u.temperatur <= u.frost_temp
+
+
 def kategorie(grund: str) -> str:
     """Art einer Fahrt aus ihrem Grund ableiten."""
     if grund.startswith("Alle"):
@@ -415,8 +424,8 @@ class Rollladen:
             self.z.oeffnen_nachholen = True
             self._melde(INFO, "Öffnen: es wird noch geschlafen – öffnet beim Aufstehen")
             return []
-        if self.e.frostschutz and u.temperatur is not None and u.temperatur <= u.frost_temp:
-            self._melde(WARNUNG, f"Öffnen: Frostschutz ({u.temperatur:.1f} °C)")
+        if frost_haelt_zurueck(self.e, u):
+            self._melde(WARNUNG, f"{FROST_TEXT} ({u.temperatur:.1f} °C)")
             return []
         if not self._modus_passt(self.e.modus_hoch, u):
             self._melde(INFO, "Öffnen: Anwesenheit passt nicht")

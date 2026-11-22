@@ -67,7 +67,7 @@ from .const import (
 )
 from . import entitaeten
 from .protokoll import Protokoll
-from .core import kontakt_geaendert, ABSCHATTEN, LUEFTEN, MANUELL, OEFFNEN, SCHLIESSEN, WARNUNG, GEKIPPT, OFFEN, ZU, Einstellungen, Fahrt, Lage, Rollladen, Umgebung, Zustand, als_zeit
+from .core import kontakt_geaendert, frost_haelt_zurueck, FROST_TEXT, ABSCHATTEN, LUEFTEN, MANUELL, OEFFNEN, SCHLIESSEN, WARNUNG, GEKIPPT, OFFEN, ZU, Einstellungen, Fahrt, Lage, Rollladen, Umgebung, Zustand, als_zeit
 
 _LOGGER = logging.getLogger(__name__)
 PAUSE_RICHTUNGSWECHSEL = 1   # Sekunden zwischen Anhalten und Fahrt in die andere Richtung (schont den Motor)
@@ -362,6 +362,8 @@ class Steuerung:
                 self._push(f"{r.e.name}: {text}")
             elif art == ABSCHATTEN and self.schalter["push_abschatten"] and "→" in text:
                 self._push(f"{r.e.name}: {text}")
+            elif art == WARNUNG and text.startswith(FROST_TEXT):
+                self._frostmeldung()   # eine Nachricht für alle statt einer je Rollladen
             elif art == WARNUNG and self.schalter["push_warnungen"]:
                 self._push(f"⚠️ {r.e.name}: {text}")
             elif art == MANUELL and self.schalter["push_manuell"]:
@@ -381,9 +383,12 @@ class Steuerung:
             return
         feld, modus = ("hoch_zeit", "modus_hoch") if art == OEFFNEN else ("runter_zeit", "modus_runter")
         jetzt = dt_util.now()
+        u = self.umgebung()
         zeiten = [getattr(x.z, feld) for sid, x in self.rolllaeden.items()
                   if self.aktiv.get(sid) and getattr(x.e, modus) != "aus" and getattr(x.z, feld)
-                  and getattr(x.z, feld).date() == jetzt.date()]
+                  and getattr(x.z, feld).date() == jetzt.date()
+                  # wegen Frost geschlossene Rollläden öffnen nicht – nicht mitzählen
+                  and not (art == OEFFNEN and frost_haelt_zurueck(x.e, u))]
         bis = max(zeiten, default=jetzt)
         anzahl = max(len(zeiten), 1)
         if art == OEFFNEN:
@@ -391,6 +396,24 @@ class Steuerung:
         else:
             text = f"Die Rollläden werden geschlossen ({anzahl} Rollläden, bis ca. {bis:%H:%M} Uhr)."
         self._push(text)
+
+    @callback
+    def _frostmeldung(self) -> None:
+        """Frostschutz: eine Nachricht für alle zurückgehaltenen Rollläden, einmal am Morgen."""
+        heute = dt_util.now().date().isoformat()
+        if self._tagesmeldung.get("frost") == heute:
+            return
+        self._tagesmeldung["frost"] = heute
+        if not self.schalter["push_warnungen"]:
+            return
+        u = self.umgebung()
+        namen = [x.e.name for sid, x in self.rolllaeden.items()
+                 if self.aktiv.get(sid) and x.e.modus_hoch != "aus" and frost_haelt_zurueck(x.e, u)]
+        temp = "?" if u.temperatur is None else f"{u.temperatur:.1f}".replace(".", ",")
+        anzahl = max(len(namen), 1)
+        wer = f" ({', '.join(namen)})" if namen else ""
+        self._push(f"❄️ Frostschutz ({temp} °C): {anzahl} {'Rollladen bleibt' if anzahl == 1 else 'Rollläden bleiben'} "
+                   f"heute Morgen geschlossen{wer}.")
 
     @callback
     def _push(self, text: str) -> None:

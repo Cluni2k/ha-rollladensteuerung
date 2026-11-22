@@ -429,3 +429,15 @@ def test_fenster_auf_in_der_pause_nach_dem_anhalten():
     assert f[0].position == 30 and r.z.pos_vor_lueften == 0                         # neue Fahrt ersetzt die ausstehende
     f = r.fenster_event(umg(), core.Lage(29, fenster=core.ZU))
     assert f[0].position == 0
+
+
+def test_frost_haelt_zurueck_nur_mit_frostschutz():
+    kalt = umg(temperatur=2, frost_temp=5)
+    assert core.frost_haelt_zurueck(rl(frostschutz=True).e, kalt)
+    assert not core.frost_haelt_zurueck(rl(frostschutz=False).e, kalt)        # z. B. WZ links/rechts öffnen trotzdem
+    assert not core.frost_haelt_zurueck(rl(frostschutz=True).e, umg(temperatur=6, frost_temp=5))
+    assert not core.frost_haelt_zurueck(rl(frostschutz=True).e, umg(temperatur=None, frost_temp=5))
+    r = rl(frostschutz=True)
+    r.oeffnen(kalt, core.Lage(0))
+    assert r.abholen()[0][1].startswith(core.FROST_TEXT)                    # daran erkennt der Controller die Meldung
+    assert rl(frostschutz=False, offen_pos=100).oeffnen(kalt, core.Lage(0))[0].position == 100
